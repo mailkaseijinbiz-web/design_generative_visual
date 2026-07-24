@@ -151,6 +151,16 @@ button{cursor:pointer}
   flex:1 1 auto; display:flex; flex-direction:column; gap:12px;
   padding:14px 18px 18px; min-height:0;
 }
+.presets{display:flex; gap:6px; flex-wrap:wrap; align-items:center}
+.chip{
+  border:1px solid var(--line); background:transparent; color:var(--ink-2);
+  padding:3px 11px; border-radius:2px; font-size:11.5px; letter-spacing:.04em;
+  transition:border-color .15s,color .15s,background .15s;
+}
+.chip:hover{border-color:var(--ink-3); color:var(--ink)}
+.chip[aria-pressed="true"]{
+  background:var(--ink); border-color:var(--ink); color:var(--paper);
+}
 .viewport{
   position:relative; flex:1 1 auto; min-height:280px; display:grid; place-items:center;
   background:var(--sunk); border:1px solid var(--line-soft); overflow:hidden;
@@ -232,7 +242,6 @@ button{cursor:pointer}
   <div class="tools">
     <input type="file" id="file" accept="image/*" hidden>
     <button class="btn" id="btn-open">画像を読み込む</button>
-    <button class="btn" id="btn-sample">見本に戻す</button>
     <button class="btn" id="btn-reset">目標を現状に戻す</button>
     <button class="btn primary" id="btn-save">改変案をPNG保存</button>
   </div>
@@ -262,6 +271,7 @@ button{cursor:pointer}
       <span class="cap" id="stage-cap">─</span>
     </div>
     <div class="stage-body">
+      <div class="presets" id="presets" role="group" aria-label="サンプル対象"></div>
       <div class="viewport" id="viewport">
         <canvas id="view"></canvas>
         <span class="badge l">現状</span>
@@ -391,8 +401,8 @@ const state = {
   mode: "goal",
   wipe: 42,
   src: null,        // {w,h,data:Uint8ClampedArray} 原画（表示解像度）
-  full: null,       // 原寸 ImageBitmap/HTMLImageElement（保存用）
-  label: "見本：椅子（手続き生成）"
+  preset: "glasses",
+  label: ""
 };
 
 /* ============================================================
@@ -666,25 +676,28 @@ function estimate(src, w, h){
   const colorfulness = Math.sqrt(sdRG * sdRG + sdYB * sdYB) + .3 * Math.hypot(sumRG / n, sumYB / n);
   const meanWarm = warm / n;
 
-  // 高周波成分＝細部の量
-  let edge = 0, en = 0;
+  // 勾配を2つに分ける：強い勾配＝輪郭の多さ（形態）、弱い勾配＝肌理（質感）
+  let edgeDen = 0, micro = 0, en = 0;
   for (let y = 1; y < h - 1; y += 2) for (let x = 1; x < w - 1; x += 2){
     const p = (y * w + x) * 4;
     const l  = .2126 * src[p] + .7152 * src[p+1] + .0722 * src[p+2];
     const lx = .2126 * src[p+4] + .7152 * src[p+5] + .0722 * src[p+6];
     const ly = .2126 * src[p + w*4] + .7152 * src[p + w*4 + 1] + .0722 * src[p + w*4 + 2];
-    edge += (Math.abs(l - lx) + Math.abs(l - ly)) / 2; en++;
+    const gm = (Math.abs(l - lx) + Math.abs(l - ly)) / 2;
+    if (gm > 10) edgeDen++; else micro += gm;
+    en++;
   }
-  edge = edge / Math.max(1, en);
+  edgeDen /= Math.max(1, en); micro /= Math.max(1, en);
 
+  state.stats = { meanL, sdL, meanS, colorfulness, meanWarm, edgeDen, micro };
   const sc = (v, lo, hi) => Math.max(1, Math.min(5, Math.round(1 + 4 * (v - lo) / (hi - lo))));
   return {
     atmos:  sc(meanL * .6 + Math.max(0, meanWarm) * .8 + meanS * .3, .18, .78),
     image:  sc(sdL * 1.1 - meanWarm * .5 + (1 - meanS) * .25, .04, .55),
-    color:  sc(colorfulness, 8, 68),
-    form:   sc(1 - Math.min(1, edge / 26), .25, .95),
-    matter: sc(edge, 2, 24),
-    surp:   sc(colorfulness / 60 + edge / 60, .12, .85),
+    color:  sc(colorfulness, 6, 55),
+    form:   sc(1 - Math.sqrt(Math.min(1, edgeDen / .22)), .05, .95),
+    matter: sc(Math.sqrt(micro), .55, 2.4),
+    surp:   3,   // 意外性は画像統計から測れない。人が評価する。
     fit:3, func:3, combi:3
   };
 }
@@ -696,12 +709,258 @@ const $ = id => document.getElementById(id);
 const view = $("view"), vctx = view.getContext("2d", { willReadFrequently:true });
 let processed = null, renderTimer = 0;
 
-/* ── 見本画像（手続き生成：椅子と壁） ── */
-function makeSample(){
-  const w = 880, h = 620, c = document.createElement("canvas");
-  c.width = w; c.height = h;
-  const g = c.getContext("2d");
+/* ============================================================
+   見本画像（すべて手続き生成／外部素材なし）
+   ============================================================ */
+const SW = 880, SH = 620;
 
+function rr(g, x, y, w, h, r, fill){
+  g.beginPath();
+  if (g.roundRect) g.roundRect(x, y, w, h, r);
+  else { g.moveTo(x+r,y); g.arcTo(x+w,y,x+w,y+h,r); g.arcTo(x+w,y+h,x,y+h,r); g.arcTo(x,y+h,x,y,r); g.arcTo(x,y,x+w,y,r); }
+  if (fill){ g.fillStyle = fill; g.fill(); }
+}
+function grad(g, x0, y0, x1, y1, a, b){
+  const gr = g.createLinearGradient(x0, y0, x1, y1);
+  gr.addColorStop(0, a); gr.addColorStop(1, b); return gr;
+}
+function room(g, w, h, wallA, wallB, floorY, floorC){
+  g.fillStyle = grad(g, 0, 0, w * .35, h, wallA, wallB); g.fillRect(0, 0, w, h);
+  g.fillStyle = floorC; g.fillRect(0, floorY, w, h - floorY);
+  g.fillStyle = grad(g, 0, floorY, 0, h, "rgba(255,255,255,.16)", "rgba(0,0,0,.22)");
+  g.fillRect(0, floorY, w, h - floorY);
+}
+function drop(g, cx, cy, rx, ry, a){
+  g.fillStyle = `rgba(28,24,20,${a})`;
+  g.beginPath(); g.ellipse(cx, cy, rx, ry, 0, 0, Math.PI * 2); g.fill();
+}
+function bar(g, x1, y1, x2, y2, thick, color){
+  g.strokeStyle = color; g.lineWidth = thick; g.lineCap = "round";
+  g.beginPath(); g.moveTo(x1, y1); g.lineTo(x2, y2); g.stroke();
+}
+
+/* 1. メガネ ─ 装身具。フィット性と質感が主役 */
+function drawGlasses(g, w, h){
+  g.fillStyle = grad(g, 0, 0, w * .4, h, "#E6DFD2", "#C7BCA9"); g.fillRect(0, 0, w, h);
+  g.fillStyle = grad(g, 0, h * .64, 0, h, "#BFB09A", "#8E8271"); g.fillRect(0, h * .64, w, h * .36);
+  const light = g.createLinearGradient(w * .1, 0, w * .7, h);
+  light.addColorStop(0, "rgba(255,248,232,.5)"); light.addColorStop(1, "rgba(255,248,232,0)");
+  g.fillStyle = light; g.fillRect(0, 0, w, h);
+  drop(g, w * .5, h * .615, w * .27, h * .038, .26);
+
+  const cy = h * .45, lw = w * .205, lh = h * .175, gap = w * .05, frame = "#3B2A21";
+  const lx = w * .5 - gap / 2 - lw, rx = w * .5 + gap / 2;
+
+  // つる（奥へ）
+  g.lineCap = "round";
+  [[lx + lw * .06, -1], [rx + lw * .94, 1]].forEach(([hx, dir]) => {
+    g.strokeStyle = "#2E211A"; g.lineWidth = 11;
+    g.beginPath();
+    g.moveTo(hx, cy - lh * .12);
+    g.quadraticCurveTo(w * .5 + dir * w * .42, cy - h * .10, w * .5 + dir * w * .445, cy + h * .10);
+    g.stroke();
+  });
+  // レンズ
+  [lx, rx].forEach(x => {
+    const gl = g.createRadialGradient(x + lw * .35, cy - lh * .3, 4, x + lw * .5, cy, lw * .8);
+    gl.addColorStop(0, "rgba(226,238,240,.72)"); gl.addColorStop(1, "rgba(122,158,168,.42)");
+    rr(g, x, cy - lh / 2, lw, lh, lh * .46, gl);
+    g.save();
+    rr(g, x, cy - lh / 2, lw, lh, lh * .46);
+    g.clip();
+    g.fillStyle = "rgba(255,255,255,.34)";
+    g.beginPath(); g.moveTo(x + lw * .08, cy + lh); g.lineTo(x + lw * .42, cy - lh);
+    g.lineTo(x + lw * .60, cy - lh); g.lineTo(x + lw * .26, cy + lh); g.closePath(); g.fill();
+    g.restore();
+    rr(g, x, cy - lh / 2, lw, lh, lh * .46);
+    g.strokeStyle = frame; g.lineWidth = 11; g.stroke();
+  });
+  // ブリッジ
+  g.strokeStyle = frame; g.lineWidth = 10;
+  g.beginPath();
+  g.moveTo(lx + lw, cy - lh * .16);
+  g.quadraticCurveTo(w * .5, cy - lh * .42, rx, cy - lh * .16);
+  g.stroke();
+  // 鼻パッドとヒンジ
+  [[lx + lw * .86, 1], [rx + lw * .14, -1]].forEach(([x, d]) => {
+    g.strokeStyle = "rgba(240,244,246,.85)"; g.lineWidth = 5;
+    g.beginPath(); g.moveTo(x, cy + lh * .12); g.lineTo(x + d * w * .012, cy + lh * .40); g.stroke();
+  });
+  [[lx + lw * .06], [rx + lw * .94]].forEach(([x]) => {
+    g.fillStyle = "#8C6A3F";
+    g.beginPath(); g.arc(x, cy - lh * .12, 5.5, 0, Math.PI * 2); g.fill();
+  });
+}
+
+/* 2. 冷蔵庫 ─ 家庭用大型家電。形態と機能性 */
+function drawFridge(g, w, h){
+  room(g, w, h, "#DFDDD4", "#B9BAB2", h * .82, "#9E9385");
+  const x = w * .35, y = h * .12, bw = w * .27, bh = h * .72, dx = w * .055, dy = h * .035;
+  drop(g, x + bw * .55, h * .845, bw * .8, h * .022, .3);
+  // 側面と天面
+  g.fillStyle = "#9DA3A5";
+  g.beginPath(); g.moveTo(x + bw, y); g.lineTo(x + bw + dx, y - dy);
+  g.lineTo(x + bw + dx, y + bh - dy); g.lineTo(x + bw, y + bh); g.closePath(); g.fill();
+  g.fillStyle = "#CBD0D2";
+  g.beginPath(); g.moveTo(x, y); g.lineTo(x + dx, y - dy);
+  g.lineTo(x + bw + dx, y - dy); g.lineTo(x + bw, y); g.closePath(); g.fill();
+  // 前面（ステンレス）
+  const st = g.createLinearGradient(x, 0, x + bw, 0);
+  st.addColorStop(0, "#C9CED0"); st.addColorStop(.28, "#EDEFF0");
+  st.addColorStop(.62, "#D3D8DA"); st.addColorStop(1, "#B4BABC");
+  g.fillStyle = st; g.fillRect(x, y, bw, bh);
+  // 扉の分割
+  const split = y + bh * .34;
+  g.strokeStyle = "rgba(60,66,68,.55)"; g.lineWidth = 2.5;
+  g.beginPath(); g.moveTo(x, split); g.lineTo(x + bw, split); g.stroke();
+  g.fillStyle = "rgba(255,255,255,.35)"; g.fillRect(x, split + 2.5, bw, 3);
+  // ハンドル
+  rr(g, x + bw * .80, y + bh * .06, w * .012, bh * .24, 5, "#5C6265");
+  rr(g, x + bw * .80, split + bh * .04, w * .012, bh * .30, 5, "#5C6265");
+  // 操作パネル
+  rr(g, x + bw * .10, y + bh * .07, bw * .30, bh * .07, 4, "#2B3134");
+  g.fillStyle = "#6FC3D6";
+  [.16, .23, .30].forEach(p => { g.beginPath(); g.arc(x + bw * p, y + bh * .105, 3.5, 0, Math.PI * 2); g.fill(); });
+  // 床の映り込み
+  g.fillStyle = "rgba(255,255,255,.10)";
+  g.beginPath(); g.moveTo(x, y + bh); g.lineTo(x + bw, y + bh);
+  g.lineTo(x + bw * .92, h * .90); g.lineTo(x + bw * .08, h * .90); g.closePath(); g.fill();
+}
+
+/* 3. CT・MRI ─ 医療機器。雰囲気（被検者の不安）が要件 */
+function drawCT(g, w, h){
+  room(g, w, h, "#E9ECEE", "#CBD3D8", h * .78, "#B4BDC2");
+  const gx = w * .30, gy = h * .13, gw = w * .46, gh = h * .65;
+  drop(g, gx + gw * .5, h * .785, gw * .55, h * .022, .26);
+  // ガントリ
+  rr(g, gx, gy, gw, gh, w * .045, grad(g, gx, gy, gx + gw, gy + gh, "#F3F5F6", "#CDD3D6"));
+  rr(g, gx + gw * .06, gy + gh * .06, gw * .88, gh * .82, w * .035, "#E2E7E9");
+  const cx = gx + gw * .5, cy = gy + gh * .46, R = w * .125;
+  // ボア
+  const bore = g.createRadialGradient(cx, cy - R * .2, R * .1, cx, cy, R);
+  bore.addColorStop(0, "#39444A"); bore.addColorStop(.75, "#222A2F"); bore.addColorStop(1, "#4E585E");
+  g.fillStyle = bore; g.beginPath(); g.arc(cx, cy, R, 0, Math.PI * 2); g.fill();
+  g.strokeStyle = "#79A9C4"; g.lineWidth = 7;
+  g.beginPath(); g.arc(cx, cy, R * 1.14, 0, Math.PI * 2); g.stroke();
+  g.strokeStyle = "rgba(255,255,255,.55)"; g.lineWidth = 2;
+  g.beginPath(); g.arc(cx, cy, R * 1.30, Math.PI * 1.1, Math.PI * 1.75); g.stroke();
+  // 表示部
+  rr(g, gx + gw * .10, gy + gh * .12, gw * .17, gh * .09, 5, "#2C363B");
+  g.fillStyle = "#8FD0C4"; g.fillRect(gx + gw * .115, gy + gh * .155, gw * .10, 3);
+  // 寝台
+  rr(g, w * .10, cy + h * .075, w * .46, h * .042, h * .02, grad(g, 0, cy, 0, cy + h * .12, "#F0F2F3", "#C5CBCE"));
+  rr(g, w * .115, cy + h * .055, w * .085, h * .028, h * .014, "#DFE4E6");
+  rr(g, w * .195, cy + h * .117, w * .115, h * .78 - cy - h * .117, 6, "#C2C9CC");
+  rr(g, w * .175, h * .755, w * .155, h * .025, 5, "#9AA3A8");
+}
+
+/* 4. 産業機械 ─ ロボットアーム。安全と機能が支配的 */
+function drawIndustrial(g, w, h){
+  room(g, w, h, "#DAD6CB", "#ABA79B", h * .70, "#7F7C74");
+  // 安全帯
+  g.save();
+  g.beginPath(); g.rect(0, h * .86, w, h * .07); g.clip();
+  g.fillStyle = "#3A3630"; g.fillRect(0, h * .86, w, h * .07);
+  g.strokeStyle = "#E0A92B"; g.lineWidth = 16;
+  for (let x = -h; x < w + h; x += 46){
+    g.beginPath(); g.moveTo(x, h * .93); g.lineTo(x + h * .07, h * .86); g.stroke();
+  }
+  g.restore();
+  // 制御盤
+  rr(g, w * .06, h * .40, w * .14, h * .32, 6, grad(g, w * .06, 0, w * .20, 0, "#6E767A", "#4A5155"));
+  [0, 1, 2].forEach(i => rr(g, w * .075, h * (.44 + i * .05), w * .11, h * .012, 2, "#39403F"));
+  g.fillStyle = "#7FD4A6"; g.beginPath(); g.arc(w * .175, h * .425, 5, 0, Math.PI * 2); g.fill();
+  drop(g, w * .40, h * .795, w * .17, h * .022, .3);
+
+  // 基台
+  rr(g, w * .32, h * .70, w * .16, h * .09, 8, "#3E4348");
+  rr(g, w * .345, h * .625, w * .11, h * .085, 12, "#E8A61F");
+  // アーム
+  const j = [[w * .40, h * .645], [w * .455, h * .365], [w * .655, h * .315], [w * .715, h * .425]];
+  bar(g, j[0][0], j[0][1], j[1][0], j[1][1], 38, "#E8A61F");
+  bar(g, j[1][0], j[1][1], j[2][0], j[2][1], 30, "#E8A61F");
+  bar(g, j[2][0], j[2][1], j[3][0], j[3][1], 20, "#C6CBCE");
+  g.strokeStyle = "rgba(0,0,0,.22)"; g.lineWidth = 3;
+  g.beginPath();
+  g.moveTo(j[0][0] + 14, j[0][1]);
+  g.quadraticCurveTo(w * .50, h * .50, j[2][0] - 10, j[2][1] + 6);
+  g.stroke();
+  j.slice(0, 3).forEach(([x, y], i) => {
+    g.fillStyle = "#33383C"; g.beginPath(); g.arc(x, y, 22 - i * 3, 0, Math.PI * 2); g.fill();
+    g.fillStyle = "#9AA1A5"; g.beginPath(); g.arc(x, y, 8 - i, 0, Math.PI * 2); g.fill();
+  });
+  // グリッパ
+  g.save();
+  g.translate(j[3][0], j[3][1]); g.rotate(.55);
+  rr(g, -14, 0, 28, 16, 3, "#5A6165");
+  rr(g, -16, 16, 8, 30, 2, "#8A9195");
+  rr(g, 8, 16, 8, 30, 2, "#8A9195");
+  g.restore();
+  // 作業台とワーク
+  rr(g, w * .60, h * .60, w * .28, h * .022, 3, "#5C6367");
+  bar(g, w * .64, h * .622, w * .635, h * .78, 9, "#4A5054");
+  bar(g, w * .85, h * .622, w * .855, h * .78, 9, "#4A5054");
+  rr(g, w * .69, h * .555, w * .075, h * .045, 3, "#B4553A");
+}
+
+/* 5. バス ─ 公共交通。多人数が同時に使う */
+function drawBus(g, w, h){
+  g.fillStyle = grad(g, 0, 0, 0, h * .7, "#D3DADD", "#AFB8BD"); g.fillRect(0, 0, w, h);
+  g.fillStyle = "rgba(60,70,78,.13)";
+  [[.02, .16, .13], [.17, .10, .22], [.30, .20, .10], [.62, .14, .18], [.80, .08, .20]]
+    .forEach(([x, ww, hh]) => g.fillRect(w * x, h * (.44 - hh), w * ww, h * hh));
+  g.fillStyle = "#6C6E6C"; g.fillRect(0, h * .70, w, h * .30);
+  g.fillStyle = "#8B8D8A"; g.fillRect(0, h * .70, w, h * .012);
+  g.strokeStyle = "rgba(255,255,255,.5)"; g.lineWidth = 4; g.setLineDash([46, 34]);
+  g.beginPath(); g.moveTo(0, h * .93); g.lineTo(w, h * .93); g.stroke();
+  g.setLineDash([]);
+
+  const x = w * .06, y = h * .30, bw = w * .88, bh = h * .40;
+  drop(g, x + bw * .5, y + bh + h * .01, bw * .48, h * .022, .32);
+  // 車体
+  rr(g, x, y, bw, bh, w * .032, grad(g, 0, y, 0, y + bh, "#F0EEE7", "#C9C6BD"));
+  rr(g, x, y + bh * .70, bw, bh * .17, 4, "#2F5F86");
+  rr(g, x, y + bh * .62, bw, bh * .045, 2, "#D8563A");
+  // 窓（扉の位置は空ける）
+  const wy = y + bh * .14, wh = bh * .40, ww = bw * .118;
+  const glass = (gx2, gy2, gw2, gh2, r) => {
+    rr(g, gx2, gy2, gw2, gh2, r, grad(g, gx2, gy2, gx2 + gw2, gy2 + gh2, "#4E6B80", "#31485C"));
+    g.save(); rr(g, gx2, gy2, gw2, gh2, r); g.clip();
+    g.fillStyle = "rgba(255,255,255,.16)";
+    g.beginPath(); g.moveTo(gx2 + gw2 * .05, gy2 + gh2); g.lineTo(gx2 + gw2 * .45, gy2);
+    g.lineTo(gx2 + gw2 * .70, gy2); g.lineTo(gx2 + gw2 * .30, gy2 + gh2); g.closePath(); g.fill();
+    g.restore();
+  };
+  [.055, .190, .420, .545, .735].forEach(p => glass(x + bw * p, wy, ww, wh, 7));
+  // 前面ガラスと行先表示
+  rr(g, x + bw * .845, wy, bw * .125, wh * 1.12, 9, grad(g, 0, wy, 0, wy + wh, "#5A788C", "#33495D"));
+  rr(g, x + bw * .845, y + bh * .045, bw * .125, bh * .07, 3, "#25292B");
+  g.fillStyle = "#E2A93B"; g.font = `${Math.round(h * .022)}px sans-serif`;
+  g.fillText("市 内 循 環", x + bw * .858, y + bh * .102);
+  // 扉（折戸）
+  [.325, .650].forEach(p => {
+    const dx2 = x + bw * p, dw = bw * .075, dy2 = y + bh * .09, dh = bh * .82;
+    rr(g, dx2 - 3, dy2 - 3, dw + 6, dh + 6, 6, "#9AA09E");
+    rr(g, dx2, dy2, dw, dh, 4, "#DFDCD4");
+    glass(dx2 + dw * .10, dy2 + bh * .05, dw * .80, dh * .62, 4);
+    g.strokeStyle = "rgba(40,50,58,.55)"; g.lineWidth = 2;
+    g.beginPath(); g.moveTo(dx2 + dw / 2, dy2); g.lineTo(dx2 + dw / 2, dy2 + dh); g.stroke();
+    rr(g, dx2 + dw * .18, dy2 + dh * .93, dw * .64, dh * .045, 2, "#8E9491");
+  });
+  // 車輪
+  [[.22, 1], [.78, 1]].forEach(([p]) => {
+    const cx = x + bw * p, cy = y + bh + h * .002;
+    g.fillStyle = "#23262A"; g.beginPath(); g.arc(cx, cy, w * .046, 0, Math.PI * 2); g.fill();
+    g.fillStyle = "#AEB4B7"; g.beginPath(); g.arc(cx, cy, w * .022, 0, Math.PI * 2); g.fill();
+    g.fillStyle = "#7E8589"; g.beginPath(); g.arc(cx, cy, w * .008, 0, Math.PI * 2); g.fill();
+  });
+  // 灯火と屋根機器
+  rr(g, x + bw * .955, y + bh * .60, bw * .03, bh * .09, 3, "#F2E2A8");
+  rr(g, x + bw * .30, y - h * .022, bw * .26, h * .024, 4, "#B9B6AD");
+}
+
+/* 6. 椅子 ─ 資料でフィット性の例に挙がる対象 */
+function drawChair(g, w, h){
   const wall = g.createLinearGradient(0, 0, w * .3, h);
   wall.addColorStop(0, "#DCD3C4"); wall.addColorStop(1, "#B9AE9C");
   g.fillStyle = wall; g.fillRect(0, 0, w, h);
@@ -760,12 +1019,51 @@ function makeSample(){
   g.beginPath(); g.ellipse(w * .252, h * .60, w * .028, h * .022, 0, 0, Math.PI * 2); g.fill();
   g.fillStyle = "rgba(255,255,255,.35)";
   g.beginPath(); g.ellipse(w * .245, h * .594, w * .012, h * .008, 0, 0, Math.PI * 2); g.fill();
+}
 
-  // わずかな粒状感
-  const im = g.getImageData(0, 0, w, h);
-  grain(im.data, .022, 7);
+/* ── プリセット一覧 ── */
+// tex は素材の肌理の量（ガラスや樹脂は小さく、塗装や布は大きい）
+const PRESETS = [
+  { id:"glasses", name:"メガネ",   context:"装身具／一日中身につける",         tex:.010, draw:drawGlasses },
+  { id:"fridge",  name:"冷蔵庫",   context:"家庭用大型家電／台所に常在",       tex:.016, draw:drawFridge },
+  { id:"ct",      name:"CT・MRI",  context:"医療機器／被検者は不安な状態",     tex:.012, draw:drawCT },
+  { id:"robot",   name:"産業機械", context:"生産設備／安全と保守が最優先",     tex:.034, draw:drawIndustrial },
+  { id:"bus",     name:"バス",     context:"公共交通／不特定多数が同時に使う", tex:.024, draw:drawBus },
+  { id:"chair",   name:"椅子",     context:"家具／資料でフィット性の例",       tex:.030, draw:drawChair }
+];
+
+function makePreset(p){
+  const c = document.createElement("canvas");
+  c.width = SW; c.height = SH;
+  const g = c.getContext("2d");
+  p.draw(g, SW, SH);
+  const im = g.getImageData(0, 0, SW, SH);
+  grain(im.data, p.tex, 7);
   g.putImageData(im, 0, 0);
   return c;
+}
+
+function usePreset(id){
+  const p = PRESETS.find(x => x.id === id) || PRESETS[0];
+  state.preset = p.id;
+  loadCanvas(makePreset(p), `${p.name}（${p.context}）`);
+  syncPresets();
+}
+
+function buildPresets(){
+  const box = $("presets");
+  box.innerHTML = "";
+  PRESETS.forEach(p => {
+    const b = document.createElement("button");
+    b.className = "chip"; b.type = "button"; b.dataset.id = p.id;
+    b.textContent = p.name; b.title = p.context;
+    b.addEventListener("click", () => usePreset(p.id));
+    box.appendChild(b);
+  });
+}
+function syncPresets(){
+  document.querySelectorAll("#presets .chip").forEach(b =>
+    b.setAttribute("aria-pressed", b.dataset.id === state.preset));
 }
 
 function loadCanvas(canvas, label){
@@ -791,7 +1089,9 @@ function loadFile(file){
     const c = document.createElement("canvas");
     c.width = img.naturalWidth; c.height = img.naturalHeight;
     c.getContext("2d").drawImage(img, 0, 0);
+    state.preset = null;
     loadCanvas(c, file.name || "読み込み画像");
+    syncPresets();
     URL.revokeObjectURL(img.src);
   };
   img.src = URL.createObjectURL(file);
@@ -1050,7 +1350,6 @@ $("wipe").addEventListener("input", e => {
 
 $("btn-open").addEventListener("click", () => $("file").click());
 $("file").addEventListener("change", e => loadFile(e.target.files[0]));
-$("btn-sample").addEventListener("click", () => loadCanvas(makeSample(), "見本：椅子（手続き生成）"));
 $("btn-reset").addEventListener("click", () => { state.goal = { ...state.now }; drawAll(); });
 
 $("btn-save").addEventListener("click", () => {
@@ -1100,7 +1399,8 @@ window.addEventListener("paste", e => {
 /* 起動 */
 setMode("goal");
 buildAxes();
-loadCanvas(makeSample(), "見本：椅子（手続き生成）");
+buildPresets();
+usePreset("glasses");
 state.goal.color = Math.min(5, state.now.color + 1);
 state.goal.matter = Math.min(5, state.now.matter + 1);
 drawAll();
