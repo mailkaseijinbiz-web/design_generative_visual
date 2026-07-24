@@ -208,6 +208,13 @@ button{cursor:pointer}
   background:var(--surface); border:1px solid var(--line); border-radius:4px;
   padding:3px 7px; font-size:13px; color:var(--ink);
 }
+.spread{display:flex; flex-wrap:wrap; gap:4px 14px; align-items:center; font-size:11px; color:var(--ink-3)}
+.spread .lab{font-weight:600; color:var(--ink-2)}
+.spread .sp{display:flex; align-items:center; gap:5px; font-variant-numeric:tabular-nums}
+.spread .sp u{display:inline-block; width:34px; height:4px; border-radius:2px; background:var(--line-soft);
+  text-decoration:none; position:relative; overflow:hidden}
+.spread .sp u i{position:absolute; left:0; top:0; bottom:0; background:var(--now)}
+.spread .sp.flat{opacity:.45}
 .maprow{display:grid; grid-template-columns:minmax(0,1fr) 200px; gap:16px; align-items:start}
 #cmap{width:100%; max-width:820px; height:auto; user-select:none; background:var(--surface);
       border:1px solid var(--line-soft); border-radius:6px}
@@ -275,6 +282,8 @@ button{cursor:pointer}
 .empty{color:var(--ink-3); font-size:13px}
 
 /* ── 評価 ── */
+svg text{font-family:var(--font-ui)}
+#map text.mono, #cmap text.mono{font-family:var(--font-mono)}
 .radar{display:block; margin:0 auto 4px}
 .legend{display:flex; gap:16px; justify-content:center; font-size:12px; color:var(--ink-3); margin-bottom:18px}
 .legend i{display:inline-block; width:16px; height:0; border-top:2px solid; vertical-align:middle; margin-right:6px}
@@ -368,6 +377,7 @@ button{cursor:pointer}
         <button class="btn mini" id="btn-corpus-img">画像から追加</button>
         <button class="btn mini" id="btn-corpus-json">コーパスを保存</button>
       </div>
+      <div class="spread" id="spread"></div>
       <div class="maprow">
         <svg id="map" viewBox="0 0 760 470" role="img" aria-label="競合の分布図"></svg>
         <div class="maplegend" id="map-legend"></div>
@@ -600,7 +610,8 @@ const state = {
   chairIdx: 0, chairLoading: false,
   corpus: {}, catOff: new Set(), advice: [], cands: [], stats: null,
   mapView: { k:1, tx:0, ty:0 }, map3: { yaw:-32, pitch:-18, k:1 },
-  mapPos: [], mapHover: null, mapDrag: null, mapDragged: false, region: null
+  mapPos: [], mapHover: null, mapDrag: null, mapDragged: false, region: null,
+  anim: null, spread: {}
 };
 
 const V = {
@@ -1427,7 +1438,7 @@ function drawRadar(){
     s += `<line x1="${cx}" y1="${cy}" x2="${x.toFixed(1)}" y2="${y.toFixed(1)}" stroke="${ink}" stroke-width=".5"/>`;
     const lx = cx + (x - cx) * 1.16, ly = cy + (y - cy) * 1.16;
     const anchor = Math.abs(lx - cx) < 8 ? "middle" : lx > cx ? "start" : "end";
-    s += `<text x="${lx.toFixed(1)}" y="${(ly + 3.5).toFixed(1)}" font-size="11" fill="${ink3}" text-anchor="${anchor}" font-family="sans-serif">${SHORT[a.key]}</text>`;
+    s += `<text x="${lx.toFixed(1)}" y="${(ly + 3.5).toFixed(1)}" font-size="11" fill="${ink3}" text-anchor="${anchor}" >${SHORT[a.key]}</text>`;
   });
   const poly = (get, color, dash) => {
     const p = AXES.map((a, i) => pt(i, get(a.key)).map(n => n.toFixed(1)).join(",")).join(" ");
@@ -1788,6 +1799,40 @@ function heatURL(pts, w, h, r){
   g.putImageData(im, 0, 0);
   return cvs.toDataURL();
 }
+/* 各項目のばらつき（この対象のコーパス内での標準偏差） */
+function axisSpread(){
+  const items = visibleCorpus(), out = {};
+  AXES.forEach(a => {
+    const rated = items.filter(it => !it.measured || it.measured.includes(a.key));
+    if (!rated.length){ out[a.key] = null; return; }
+    const m = rated.reduce((t, it) => t + it.p[a.key], 0) / rated.length;
+    out[a.key] = Math.sqrt(rated.reduce((t, it) => t + (it.p[a.key] - m) ** 2, 0) / rated.length);
+  });
+  return out;
+}
+function refreshAxisLabels(){
+  const sp = axisSpread();
+  state.spread = sp;
+  ["map-x", "map-y", "map-z", "c-x", "c-y"].forEach(id => {
+    const sel = $(id); if (!sel) return;
+    [...sel.options].forEach(o => {
+      if (o.value === "-"){ o.textContent = "なし"; return; }
+      const v = sp[o.value];
+      o.textContent = v == null ? `${AX[o.value].name}（未測定）`
+                    : v < .05 ? `${AX[o.value].name}（ばらつきなし）`
+                    : `${AX[o.value].name}（ばらつき ${v.toFixed(1)}）`;
+    });
+  });
+  const box = $("spread"); if (!box) return;
+  const mx = Math.max(.6, ...AXES.map(a => sp[a.key] || 0));
+  box.innerHTML = `<span class="lab">ばらつき</span>` + AXES.map(a => {
+    const v = sp[a.key];
+    const flat = v == null || v < .05;
+    return `<span class="sp${flat ? " flat" : ""}" title="${a.name} ${flat ? "ばらつきなし" : v.toFixed(2)}">`
+      + `${a.name}<u><i style="width:${flat ? 0 : Math.round(v / mx * 100)}%"></i></u>`
+      + `${flat ? "―" : v.toFixed(1)}</span>`;
+  }).join("");
+}
 const heatColor = t => HEAT[Math.min(HEAT.length - 1, Math.max(0, Math.round(t * (HEAT.length - 1))))];
 
 function drawMap(){
@@ -1825,6 +1870,7 @@ function drawMap(){
     drawMap(); drawCatTable(); drawAdvice();
   }));
 
+  refreshAxisLabels();
   $("corpus-cap").textContent = state.chairLoading && id === "chair"
     ? "実写サンプルを解析中…"
     : `${all.length}件／${cats.length}群（表示 ${items.length}件）・${ks.length}軸`
@@ -1856,12 +1902,34 @@ function mapScene2D(ks, items){
   const cells = new Float64Array(HN * (one ? 1 : HN));
   const bin = v => Math.max(0, Math.min(HN - 1, Math.round((v - 1) / 4 * (HN - 1))));
   items.forEach(it => cells[(one ? 0 : bin(it.p[yk])) * HN + bin(it.p[xk])]++);
+  // 点の位置（同じ値は小さな格子に並べる）
+  const pos = [];
+  {
+    const groups = new Map();
+    items.forEach(it => {
+      const key = one ? `${it.p[xk]}` : `${it.p[xk]}_${it.p[yk]}`;
+      if (!groups.has(key)) groups.set(key, []);
+      groups.get(key).push(it);
+    });
+    const zk = Math.min(2, V2.k), size0 = 20 * zk;
+    groups.forEach(list => {
+      const cols = one ? 1 : Math.ceil(Math.sqrt(list.length)), rows = Math.ceil(list.length / cols);
+      list.forEach((it, i) => {
+        const gap = it.imgId ? size0 + 1 : 13;
+        const tx = px(it.p[xk]) + (one ? 0 : (i % cols - (cols - 1) / 2) * gap);
+        const ty = one ? cy - (i - (list.length - 1) / 2) * gap
+                       : py(it.p[yk]) + (Math.floor(i / cols) - (rows - 1) / 2) * gap;
+        const [bxp, byp] = blend(it, tx, ty);
+        pos.push({ it, x:bxp, y:byp, size:size0 });
+      });
+    });
+  }
+  // 密度（連続した場）
   {
     const pw = x1 - x0, ph = y1 - y0;
     const perUnit0 = (x1 - x0 - 44) / 4 * V2.k;
-    const pts = items.map(it => ({ x: px(it.p[xk]) - x0, y: (one ? cy : py(it.p[yk])) - y0 }));
-    if (pts.length){
-      const url = heatURL(pts, pw, ph, Math.max(12, perUnit0 * .30));
+    if (pos.length){
+      const url = heatURL(pos.map(p => ({ x:p.x - x0, y:p.y - y0 })), pw, ph, Math.max(12, perUnit0 * .30));
       plot += `<image href="${url}" x="${x0}" y="${y0}" width="${pw}" height="${ph}" preserveAspectRatio="none"/>`;
     }
   }
@@ -1878,7 +1946,7 @@ function mapScene2D(ks, items){
     if (best && bd >= 2){
       const tx2 = px(1 + best[0] * 4 / (HN - 1)), ty2 = py(1 + best[1] * 4 / (HN - 1));
       plot += `<text x="${tx2.toFixed(1)}" y="${ty2.toFixed(1)}" font-size="11" fill="${ink3}" `
-        + `text-anchor="middle" font-family="sans-serif">空白</text>`;
+        + `text-anchor="middle" >空白</text>`;
     }
   }
 
@@ -1904,25 +1972,7 @@ function mapScene2D(ks, items){
   if (one) plot += `<line x1="${x0}" y1="${cy.toFixed(1)}" x2="${x1}" y2="${cy.toFixed(1)}" stroke="${soft}" stroke-width="1"/>`;
 
   // 点
-  const pos = [];
-  const groups = new Map();
-  items.forEach(it => {
-    const key = one ? `${it.p[xk]}` : `${it.p[xk]}_${it.p[yk]}`;
-    if (!groups.has(key)) groups.set(key, []);
-    groups.get(key).push(it);
-  });
-  const zk = Math.min(2, V2.k), size = 20 * zk;
-  groups.forEach(list => {
-    const cols = one ? 1 : Math.ceil(Math.sqrt(list.length)), rows = Math.ceil(list.length / cols);
-    list.forEach((it, i) => {
-      const gap = (it.imgId ? size + 1 : 13) * (one ? 1 : 1);
-      const x = px(it.p[xk]) + (one ? 0 : (i % cols - (cols - 1) / 2) * gap);
-      const y = one ? cy - (i - (list.length - 1) / 2) * gap
-                    : py(it.p[yk]) + (Math.floor(i / cols) - (rows - 1) / 2) * gap;
-      pos.push({ it, x, y });
-      plot += mapMark(it, x, y, pos.length - 1, size, paper);
-    });
-  });
+  pos.forEach((p, i) => { plot += mapMark(p.it, p.x, p.y, i, p.size, paper); });
   state.mapPos = pos;
 
   // 市場の重心とばらつき
@@ -1940,7 +1990,7 @@ function mapScene2D(ks, items){
       + `<line x1="${(gxc-8).toFixed(1)}" y1="${gyc.toFixed(1)}" x2="${(gxc+8).toFixed(1)}" y2="${gyc.toFixed(1)}" stroke="${ink2}" stroke-width="2"/>`
       + `<line x1="${gxc.toFixed(1)}" y1="${(gyc-8).toFixed(1)}" x2="${gxc.toFixed(1)}" y2="${(gyc+8).toFixed(1)}" stroke="${ink2}" stroke-width="2"/>`
       + `<rect x="${(gxc+10).toFixed(1)}" y="${(gyc-20).toFixed(1)}" width="94" height="16" rx="3" fill="${paper}" opacity=".85"/>`
-      + `<text x="${(gxc+14).toFixed(1)}" y="${(gyc-8).toFixed(1)}" font-size="11" fill="${ink2}" font-family="sans-serif">`
+      + `<text x="${(gxc+14).toFixed(1)}" y="${(gyc-8).toFixed(1)}" font-size="11" fill="${ink2}" >`
       + `市場の重心 ${fmt(Math.round(mxv*10)/10)}${one ? "" : " / " + fmt(Math.round(myv*10)/10)}</text></g>`;
   }
 
@@ -1959,19 +2009,13 @@ function mapScene2D(ks, items){
   [1,2,3,4,5].forEach(v => {
     const tx2 = px(v), ty2 = one ? cy : py(v);
     if (tx2 > x0 - 1 && tx2 < x1 + 1)
-      s += `<text x="${tx2.toFixed(1)}" y="${y1 + 16}" font-size="11" fill="${ink3}" text-anchor="middle" font-family="monospace">${v}</text>`;
+      s += `<text x="${tx2.toFixed(1)}" y="${y1 + 16}" font-size="11" fill="${ink3}" text-anchor="middle" class="mono">${v}</text>`;
     if (!one && ty2 > y0 - 1 && ty2 < y1 + 1)
-      s += `<text x="${x0 - 10}" y="${(ty2 + 4).toFixed(1)}" font-size="11" fill="${ink3}" text-anchor="end" font-family="monospace">${v}</text>`;
+      s += `<text x="${x0 - 10}" y="${(ty2 + 4).toFixed(1)}" font-size="11" fill="${ink3}" text-anchor="end" class="mono">${v}</text>`;
   });
-  const ax = AX[xk];
-  s += `<text x="${x0}" y="${y1 + 38}" font-size="12.5" fill="${ink2}" font-family="sans-serif">`
-    + `<tspan font-weight="600">横軸 ${ax.name}</tspan><tspan fill="${ink3}">　${ax.low || "低"} → ${ax.high || "高"}</tspan></text>`;
-  if (!one){
-    const ay = AX[yk];
-    s += `<text transform="rotate(-90 ${x0 - 34} ${y1})" x="${x0 - 34}" y="${y1}" font-size="12.5" fill="${ink2}" font-family="sans-serif">`
-      + `<tspan font-weight="600">縦軸 ${ay.name}</tspan><tspan fill="${ink3}">　${ay.low || "低"} → ${ay.high || "高"}</tspan></text>`;
-  } else {
-    s += `<text x="${x0}" y="${y0 - 8}" font-size="12" fill="${ink3}" font-family="sans-serif">1軸表示（同じ値は縦に積んでいます）</text>`;
+  s += axisLabels(AX[xk], !one && AX[yk], x0, x1, y0, y1, ink2, ink3, one);
+  if (one){
+    s += `<text x="${x0}" y="${y0 - 8}" font-size="12" fill="${ink3}">1軸表示（同じ値は縦に積んでいます）</text>`;
   }
   return s;
 }
@@ -2007,7 +2051,7 @@ function mapScene3D(ks, items){
       + `stroke="${line}" stroke-width="1.8"/>`;
     const lx = e[0] + (e[0] - o[0]) * .08, ly = e[1] + (e[1] - o[1]) * .08;
     s += `<rect x="${(lx - 6).toFixed(1)}" y="${(ly - 13).toFixed(1)}" width="${(AX[k].name.length * 12 + 34)}" height="18" rx="3" fill="${paper}" opacity=".9"/>`
-      + `<text x="${lx.toFixed(1)}" y="${ly.toFixed(1)}" font-size="12" font-family="sans-serif" fill="${ink2}">`
+      + `<text x="${lx.toFixed(1)}" y="${ly.toFixed(1)}" font-size="12"  fill="${ink2}">`
       + `<tspan fill="${ink3}">${label} </tspan><tspan font-weight="600">${AX[k].name}</tspan></text>`;
   });
 
@@ -2019,8 +2063,9 @@ function mapScene3D(ks, items){
   }).sort((a, b) => a.z - b.z);
   drawn.forEach(d => {
     const scale = Math.max(.55, Math.min(1.7, 1 / (dist - d.z) * 3.1)) * M.k;
-    pos.push({ it:d.it, x:d.x, y:d.y });
-    s += mapMark(d.it, d.x, d.y, pos.length - 1, 20 * scale, paper);
+    const [bx2, by2] = blend(d.it, d.x, d.y);
+    pos.push({ it:d.it, x:bx2, y:by2 });
+    s += mapMark(d.it, bx2, by2, pos.length - 1, 20 * scale, paper);
   });
   state.mapPos = pos;
 
@@ -2033,7 +2078,7 @@ function mapScene3D(ks, items){
       + `<line x1="${(c3[0]-8).toFixed(1)}" y1="${c3[1].toFixed(1)}" x2="${(c3[0]+8).toFixed(1)}" y2="${c3[1].toFixed(1)}" stroke="${ink2}" stroke-width="2"/>`
       + `<line x1="${c3[0].toFixed(1)}" y1="${(c3[1]-8).toFixed(1)}" x2="${c3[0].toFixed(1)}" y2="${(c3[1]+8).toFixed(1)}" stroke="${ink2}" stroke-width="2"/>`
       + `<rect x="${(c3[0]+10).toFixed(1)}" y="${(c3[1]-20).toFixed(1)}" width="66" height="16" rx="3" fill="${paper}" opacity=".85"/>`
-      + `<text x="${(c3[0]+14).toFixed(1)}" y="${(c3[1]-8).toFixed(1)}" font-size="11" fill="${ink2}" font-family="sans-serif">市場の重心</text></g>`;
+      + `<text x="${(c3[0]+14).toFixed(1)}" y="${(c3[1]-8).toFixed(1)}" font-size="11" fill="${ink2}" >市場の重心</text></g>`;
   }
 
   const n3 = at(state.now[xk], state.now[yk], state.now[zk]);
@@ -2042,6 +2087,20 @@ function mapScene3D(ks, items){
   if (n3[0] !== g3[0] || n3[1] !== g3[1])
     s += `<line x1="${n3[0]}" y1="${n3[1]}" x2="${g3[0]}" y2="${g3[1]}" stroke="${goal}" stroke-width="1.5" stroke-dasharray="4 3"/>`;
   s += marker(n3[0], n3[1], g3[0], g3[1], now, goal, paper, ink2) + `</g>`;
+  return s;
+}
+
+/* 軸の見出し：中央に項目名、両端に意味 */
+function axisLabels(ax, ay, x0, x1, y0, y1, ink2, ink3, one){
+  const midX = (x0 + x1) / 2, midY = (y0 + y1) / 2, yb = y1 + 38, lx = x0 - 38;
+  let s = `<text x="${x0}" y="${yb}" font-size="11.5" fill="${ink3}">${ax.low || "低"}</text>`
+    + `<text x="${midX}" y="${yb}" font-size="13" font-weight="600" fill="${ink2}" text-anchor="middle">${ax.name}</text>`
+    + `<text x="${x1}" y="${yb}" font-size="11.5" fill="${ink3}" text-anchor="end">${ax.high || "高"}</text>`;
+  if (ay && !one){
+    s += `<text transform="rotate(-90 ${lx} ${y1})" x="${lx}" y="${y1}" font-size="11.5" fill="${ink3}">${ay.low || "低"}</text>`
+      + `<text transform="rotate(-90 ${lx} ${midY})" x="${lx}" y="${midY}" font-size="13" font-weight="600" fill="${ink2}" text-anchor="middle">${ay.name}</text>`
+      + `<text transform="rotate(-90 ${lx} ${y0})" x="${lx}" y="${y0}" font-size="11.5" fill="${ink3}" text-anchor="end">${ay.high || "高"}</text>`;
+  }
   return s;
 }
 
@@ -2068,10 +2127,33 @@ function marker(nx, ny, gx, gy, now, goal, paper, ink2){
   (same ? [[nx, ny, "現状＝目標", ink2, 66]] : [[nx, ny, "現状", now, 30], [gx, gy, "目標", goal, 30]])
     .forEach(([x, y, t, c, w]) => {
       s += `<rect x="${x + 13}" y="${y - 8}" width="${w}" height="16" rx="3" fill="${paper}" opacity=".85"/>`
-        + `<text x="${x + 17}" y="${y + 4}" font-size="11" fill="${c}" font-family="sans-serif">${t}</text>`;
+        + `<text x="${x + 17}" y="${y + 4}" font-size="11" fill="${c}" >${t}</text>`;
     });
   return s;
 }
+
+/* 軸を変えたら、点が新しい位置へ滑らかに移動する */
+function animateMap(){
+  const from = new Map();
+  (state.mapPos || []).forEach(p => from.set(p.it.name, { x:p.x, y:p.y }));
+  if (!from.size){ drawMap(); return; }
+  const a = { from, t:0 };
+  state.anim = a;
+  const t0 = performance.now(), dur = 560;
+  const step = () => {
+    if (state.anim !== a) return;          // 新しい切替が始まったら降りる
+    const e = Math.min(1, (performance.now() - t0) / dur);
+    a.t = e < .5 ? 4 * e * e * e : 1 - Math.pow(-2 * e + 2, 3) / 2;
+    drawMap();
+    if (e < 1) requestAnimationFrame(step);
+    else { state.anim = null; drawMap(); }
+  };
+  requestAnimationFrame(step);
+}
+const blend = (it, x, y) => {
+  const f = state.anim && state.anim.from.get(it.name);
+  return f ? [f.x + (x - f.x) * state.anim.t, f.y + (y - f.y) * state.anim.t] : [x, y];
+};
 
 /* ── 拡大・移動・回転 ── */
 function mapReset(){
@@ -2161,9 +2243,9 @@ function mapPreview(i){
   if (img) g += `<image href="${img}" x="${bx + 8}" y="${by + 8}" width="${side}" height="${side}" `
               + `preserveAspectRatio="xMidYMid meet"/>`;
   const ty = by + (img ? side + 12 : 6) + 18;
-  g += `<text x="${bx + 11}" y="${ty}" font-size="12" font-family="sans-serif" fill="${cssv("--ink")}">${it.name}</text>`
+  g += `<text x="${bx + 11}" y="${ty}" font-size="12"  fill="${cssv("--ink")}">${it.name}</text>`
     +  `<circle cx="${bx + 15}" cy="${ty + 15}" r="4" fill="${col}"/>`
-    +  `<text x="${bx + 25}" y="${ty + 19}" font-size="11" font-family="sans-serif" fill="${cssv("--ink-3")}">${it.cat}`
+    +  `<text x="${bx + 25}" y="${ty + 19}" font-size="11"  fill="${cssv("--ink-3")}">${it.cat}`
     +  `${it.imgId ? "（クリックで現状に採用）" : ""}</text>`;
   // 元の点も強調
   g += it.imgId
@@ -2265,7 +2347,7 @@ function drawConceptMap(){
       + `<rect x="${cx0.toFixed(1)}" y="${cy0.toFixed(1)}" width="${(cx1-cx0).toFixed(1)}" height="${(cy1-cy0).toFixed(1)}" `
       + `fill="${on ? goal : "transparent"}" fill-opacity="${on ? .10 : 1}" `
       + `stroke="${on ? goal : line}" stroke-width="${on ? 2.5 : 1}"/>`
-      + `<text x="${(cx0+6).toFixed(1)}" y="${(cy0+15).toFixed(1)}" font-size="10.5" font-family="monospace" `
+      + `<text x="${(cx0+6).toFixed(1)}" y="${(cy0+15).toFixed(1)}" font-size="10.5" class="mono" `
       + `fill="${ink3}">${n}</text></g>`;
   }
   // 競合
@@ -2281,7 +2363,7 @@ function drawConceptMap(){
     + `<line x1="${(gx0-9).toFixed(1)}" y1="${gy0.toFixed(1)}" x2="${(gx0+9).toFixed(1)}" y2="${gy0.toFixed(1)}" stroke="${ink2}" stroke-width="2"/>`
     + `<line x1="${gx0.toFixed(1)}" y1="${(gy0-9).toFixed(1)}" x2="${gx0.toFixed(1)}" y2="${(gy0+9).toFixed(1)}" stroke="${ink2}" stroke-width="2"/>`
     + `<rect x="${(gx0+11).toFixed(1)}" y="${(gy0-19).toFixed(1)}" width="72" height="16" rx="3" fill="${paper}" opacity=".85"/>`
-    + `<text x="${(gx0+15).toFixed(1)}" y="${(gy0-7).toFixed(1)}" font-size="11" fill="${ink2}" font-family="sans-serif">市場の重心</text>`;
+    + `<text x="${(gx0+15).toFixed(1)}" y="${(gy0-7).toFixed(1)}" font-size="11" fill="${ink2}" >市場の重心</text>`;
   // 重心 → 狙う領域
   if (sel){
     const tx = px(sel.cx), ty = py(sel.cy);
@@ -2293,18 +2375,15 @@ function drawConceptMap(){
   s += `<circle cx="${px(state.now[xk]).toFixed(1)}" cy="${py(state.now[yk]).toFixed(1)}" r="10" fill="none" stroke="${paper}" stroke-width="5"/>`
     + `<circle cx="${px(state.now[xk]).toFixed(1)}" cy="${py(state.now[yk]).toFixed(1)}" r="10" fill="none" stroke="${now}" stroke-width="2.5"/>`
     + `<rect x="${(px(state.now[xk])+12).toFixed(1)}" y="${(py(state.now[yk])-8).toFixed(1)}" width="30" height="16" rx="3" fill="${paper}" opacity=".85"/>`
-    + `<text x="${(px(state.now[xk])+16).toFixed(1)}" y="${(py(state.now[yk])+4).toFixed(1)}" font-size="11" fill="${now}" font-family="sans-serif">現状</text></g>`;
+    + `<text x="${(px(state.now[xk])+16).toFixed(1)}" y="${(py(state.now[yk])+4).toFixed(1)}" font-size="11" fill="${now}" >現状</text></g>`;
   // 枠と軸
   s += `<rect x="${x0}" y="${y0}" width="${x1-x0}" height="${y1-y0}" fill="none" stroke="${line}" rx="4"/>`;
   [1,2,3,4,5].forEach(v => {
-    s += `<text x="${px(v).toFixed(1)}" y="${y1+16}" font-size="11" fill="${ink3}" text-anchor="middle" font-family="monospace">${v}</text>`
-      + `<text x="${x0-10}" y="${(py(v)+4).toFixed(1)}" font-size="11" fill="${ink3}" text-anchor="end" font-family="monospace">${v}</text>`;
+    s += `<text x="${px(v).toFixed(1)}" y="${y1+16}" font-size="11" fill="${ink3}" text-anchor="middle" class="mono">${v}</text>`
+      + `<text x="${x0-10}" y="${(py(v)+4).toFixed(1)}" font-size="11" fill="${ink3}" text-anchor="end" class="mono">${v}</text>`;
   });
   const ax = AX[xk], ay = AX[yk];
-  s += `<text x="${x0}" y="${y1+38}" font-size="12.5" fill="${ink2}" font-family="sans-serif">`
-    + `<tspan font-weight="600">横軸 ${ax.name}</tspan><tspan fill="${ink3}">　${ax.low || "低"} → ${ax.high || "高"}</tspan></text>`
-    + `<text transform="rotate(-90 ${x0-36} ${y1})" x="${x0-36}" y="${y1}" font-size="12.5" fill="${ink2}" font-family="sans-serif">`
-    + `<tspan font-weight="600">縦軸 ${ay.name}</tspan><tspan fill="${ink3}">　${ay.low || "低"} → ${ay.high || "高"}</tspan></text>`;
+  s += axisLabels(ax, ay, x0, x1, y0, y1, ink2, ink3, false);
 
   const svg = $("cmap");
   svg.innerHTML = s;
@@ -2861,7 +2940,10 @@ document.querySelectorAll(".tab").forEach(b =>
 $("vis-3d").addEventListener("click", () => setVis("3d"));
 $("vis-img").addEventListener("click", () => setVis("img"));
 
-["map-x", "map-y", "map-z"].forEach(id => $(id).addEventListener("change", () => { mapReset(); }));
+["map-x", "map-y", "map-z"].forEach(id => $(id).addEventListener("change", () => {
+  state.mapView = { k:1, tx:0, ty:0 };
+  animateMap();
+}));
 $("map-zoom-in").addEventListener("click", () => mapZoom(1.35));
 $("map-zoom-out").addEventListener("click", () => mapZoom(1 / 1.35));
 $("map-reset").addEventListener("click", mapReset);
