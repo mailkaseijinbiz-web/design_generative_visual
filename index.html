@@ -233,7 +233,10 @@ button{cursor:pointer}
   padding:3px 7px; font-size:13px; color:var(--ink);
 }
 .maprow{display:grid; grid-template-columns:minmax(0,1fr) 200px; gap:16px; align-items:start}
+#cmap{width:100%; max-width:820px; height:auto; user-select:none; background:var(--surface);
+      border:1px solid var(--line-soft); border-radius:6px}
 #map{width:100%; height:auto; max-height:calc(100vh - 250px); background:var(--surface);
+     user-select:none; -webkit-user-select:none; touch-action:none; cursor:grab;
      border:1px solid var(--line-soft); border-radius:6px}
 .maplegend{display:flex; flex-direction:column; gap:2px; font-size:12.5px}
 .maplegend button{
@@ -243,6 +246,8 @@ button{cursor:pointer}
 .maplegend button:hover{background:var(--hover)}
 .maplegend button[aria-pressed="false"]{opacity:.4}
 .maplegend i{width:9px; height:9px; border-radius:50%; flex:0 0 auto}
+.heatkey{display:flex; align-items:center; gap:6px; margin-top:10px; font-size:11.5px; color:var(--ink-3)}
+.heatkey i{flex:1 1 auto; height:8px; border-radius:2px; min-width:56px}
 .maplegend b{margin-left:auto; font-family:var(--font-mono); font-size:11px; font-weight:400; color:var(--ink-3)}
 .cattable{display:flex; flex-direction:column}
 .catrow{
@@ -378,7 +383,11 @@ button{cursor:pointer}
       <div class="mapbar">
         <label>横軸 <select id="map-x"></select></label>
         <label>縦軸 <select id="map-y"></select></label>
+        <label>奥行き <select id="map-z"></select></label>
         <span class="spacer" style="flex:1 1 auto"></span>
+        <button class="btn mini" id="map-zoom-out" aria-label="縮小">−</button>
+        <button class="btn mini" id="map-zoom-in" aria-label="拡大">＋</button>
+        <button class="btn mini" id="map-reset">表示をリセット</button>
         <input type="file" id="corpus-file" accept="image/*" multiple hidden>
         <button class="btn mini" id="btn-corpus-img">画像から追加</button>
         <button class="btn mini" id="btn-corpus-json">コーパスを保存</button>
@@ -401,8 +410,23 @@ button{cursor:pointer}
       <span class="cap" id="concept-cap">─</span>
     </div>
     <div class="pane-body">
-      <p class="hint">用途文脈での重要度 × 市場の空き × 伸びしろ の積で並べています。</p>
-      <div class="advice" id="advice"></div>
+      <div class="mapbar">
+        <label>横軸 <select id="c-x"></select></label>
+        <label>縦軸 <select id="c-y"></select></label>
+        <label>グリッド <select id="c-grid">
+          <option value="2">2×2</option><option value="3">3×3</option>
+          <option value="4" selected>4×4</option><option value="5">5×5</option>
+          <option value="6">6×6</option></select></label>
+        <span class="spacer" style="flex:1 1 auto"></span>
+        <button class="btn mini" id="c-clear">領域の指定を外す</button>
+      </div>
+      <svg id="cmap" viewBox="0 0 680 430" role="img" aria-label="狙う領域の指定"></svg>
+      <p class="hint" id="c-region"></p>
+      <div class="block" style="margin:0">
+        <h3>伸ばす項目</h3>
+        <p class="hint" style="margin-bottom:10px">用途文脈での重要度 × 市場の空き × 伸びしろ の積で並べています。</p>
+        <div class="advice" id="advice"></div>
+      </div>
       <div class="block">
         <h3>コンセプト文</h3>
         <textarea class="brief" id="concept-text" spellcheck="false" aria-label="コンセプト文" style="min-height:130px"></textarea>
@@ -598,7 +622,9 @@ const state = {
   vis: "3d",
   yaw: -28, pitch: -14, spin: false,
   chairIdx: 0, chairLoading: false,
-  corpus: {}, catOff: new Set(), advice: [], cands: [], stats: null
+  corpus: {}, catOff: new Set(), advice: [], cands: [], stats: null,
+  mapView: { k:1, tx:0, ty:0 }, map3: { yaw:-32, pitch:-18, k:1 },
+  mapPos: [], mapHover: null, mapDrag: null, mapDragged: false, region: null
 };
 
 const V = {
@@ -1548,7 +1574,7 @@ function drawAll(){
   buildOutput();
   clearTimeout(renderTimer);
   if (state.tab === "research"){ drawMap(); drawCatTable(); }
-  if (state.tab === "concept") drawAdvice();
+  if (state.tab === "concept"){ drawConceptMap(); drawAdvice(); }
   if (state.tab === "eval"){ drawChecks(); drawSaved(); }
   if (state.tab === "visual"){
     if (state.vis === "3d") render3D();
@@ -1663,7 +1689,7 @@ function ensureChairCorpus(){
     state.corpus.chair = items;
     state.chairLoading = false;
     if (state.tab === "research"){ drawMap(); drawCatTable(); }
-    if (state.tab === "concept") drawAdvice();
+    if (state.tab === "concept"){ drawConceptMap(); drawAdvice(); }
   };
   CHAIRS.forEach((c, i) => {
     const img = new Image();
@@ -1721,121 +1747,58 @@ function clusterItems(items, K = 4){
   });
 }
 
-/* ── マップ ── */
+/* ── マップ ──
+   軸は1〜3項目まで選べる。1つなら帯、2つなら平面、3つなら立体。
+   密度（ヒートマップ）は逐次配色（青一色・淡→濃）。 */
+const MAP_W = 760, MAP_H = 470, PAD = { L:70, R:26, T:26, B:66 };
+const HEAT = ["#cde2fb","#b7d3f6","#9ec5f4","#86b6ef","#6da7ec","#5598e7","#3987e5","#256abf"];
+const HEAT_N = 12;
+
 function fillAxisSelects(){
-  ["map-x", "map-y"].forEach(id => {
-    const s = $(id);
+  const opt = (s, none) => {
     if (s.options.length) return;
+    if (none) s.add(new Option("なし", "-"));
     AXES.forEach(a => s.add(new Option(a.name, a.key)));
-  });
-  $("map-x").value = "form"; $("map-y").value = "color";
+  };
+  opt($("map-x"), false); opt($("map-y"), true); opt($("map-z"), true);
+  $("map-x").value = "form"; $("map-y").value = "color"; $("map-z").value = "-";
 }
+function mapAxes(){
+  if ($("map-y").value === "-") $("map-z").value = "-";
+  $("map-z").disabled = $("map-y").value === "-";
+  return [...new Set([$("map-x").value, $("map-y").value, $("map-z").value].filter(k => k && k !== "-"))];
+}
+const heatColor = t => HEAT[Math.min(HEAT.length - 1, Math.max(0, Math.round(t * (HEAT.length - 1))))];
 
 function drawMap(){
   const id = state.preset || "chair", all = corpusOf(id), items = visibleCorpus();
-  const xk = $("map-x").value, yk = $("map-y").value;
-  const W = 760, H = 470, L = 54, R = 18, T = 18, B = 44;
-  const px = v => L + (v - 1) / 4 * (W - L - R);
-  const py = v => H - B - (v - 1) / 4 * (H - T - B);
-  const line = cssv("--line"), ink3 = cssv("--ink-3"), now = cssv("--now"), goal = cssv("--goal");
-  let s = "";
-
-  // 密度（4×4）：薄いほど空いている
-  const cells = Array.from({ length: 16 }, () => 0);
-  items.forEach(it => {
-    const cx = Math.min(3, Math.floor((it.p[xk] - 1) / 4 * 4)), cy = Math.min(3, Math.floor((it.p[yk] - 1) / 4 * 4));
-    cells[cy * 4 + cx]++;
-  });
-  const mx = Math.max(1, ...cells);
-  for (let r = 0; r < 4; r++) for (let c = 0; c < 4; c++){
-    const n = cells[r * 4 + c], x0 = px(1 + c), x1 = px(2 + c), y0 = py(2 + r), y1 = py(1 + r);
-    s += `<rect x="${x0}" y="${y0}" width="${x1 - x0}" height="${y1 - y0}" fill="${cssv("--ink")}" fill-opacity="${(n / mx * .07).toFixed(3)}"/>`;
-    if (n === 0) s += `<text x="${(x0 + x1) / 2}" y="${(y0 + y1) / 2 + 4}" font-size="9.5" fill="${ink3}" text-anchor="middle" opacity=".65">空白</text>`;
-  }
-  // 目盛
-  for (let v = 1; v <= 5; v++){
-    s += `<line x1="${px(v)}" y1="${T}" x2="${px(v)}" y2="${H - B}" stroke="${line}" stroke-width=".5"/>`;
-    s += `<line x1="${L}" y1="${py(v)}" x2="${W - R}" y2="${py(v)}" stroke="${line}" stroke-width=".5"/>`;
-    s += `<text x="${px(v)}" y="${H - B + 15}" font-size="10" fill="${ink3}" text-anchor="middle" font-family="monospace">${v}</text>`;
-    s += `<text x="${L - 9}" y="${py(v) + 4}" font-size="10" fill="${ink3}" text-anchor="end" font-family="monospace">${v}</text>`;
-  }
-  s += `<text x="${(L + W - R) / 2}" y="${H - 8}" font-size="11" fill="${ink3}" text-anchor="middle">${AX[xk].name} →</text>`;
-  s += `<text x="14" y="${(T + H - B) / 2}" font-size="11" fill="${ink3}" text-anchor="middle" transform="rotate(-90 14 ${(T + H - B) / 2})">${AX[yk].name} →</text>`;
-
-  // 競合（実写は縮小画像そのものを置く）。同じ座標に集まるので小さな格子に並べる
-  const groups = new Map();
-  items.forEach(it => {
-    const key = `${it.p[xk]}_${it.p[yk]}`;
-    if (!groups.has(key)) groups.set(key, []);
-    groups.get(key).push(it);
-  });
-  const pos = [];
-  groups.forEach(list => {
-    const cols = Math.ceil(Math.sqrt(list.length)), rows = Math.ceil(list.length / cols);
-    list.forEach((it, i) => {
-      const step = it.imgId ? 21 : 13, half = it.imgId ? 10 : 0;
-      const x = px(it.p[xk]) + (i % cols - (cols - 1) / 2) * step;
-      const y = py(it.p[yk]) + (Math.floor(i / cols) - (rows - 1) / 2) * step;
-      const col = CAT_COLORS[(it.ci || 0) % CAT_COLORS.length];
-      const n = pos.push({ it, x, y }) - 1;
-      if (it.imgId){
-        s += `<g data-i="${n}" data-idx="${it.idx}" style="cursor:pointer">`
-          +  `<use href="#${it.imgId}" x="${(x-half).toFixed(1)}" y="${(y-half).toFixed(1)}"/>`
-          +  `<rect x="${(x-half).toFixed(1)}" y="${(y-half).toFixed(1)}" width="20" height="20" fill="none" `
-          +  `stroke="${col}" stroke-width="1.8"/></g>`;
-      } else {
-        s += `<circle data-i="${n}" cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="5.5" fill="${col}" `
-          +  `fill-opacity="${it.src === "合成" ? .5 : .85}" stroke="${it.src === "合成" ? "none" : cssv("--ink")}" `
-          +  `stroke-width="1"/>`;
-      }
-    });
-  });
-  state.mapPos = pos;
-  // 自社
-  const nx = px(state.now[xk]), ny = py(state.now[yk]), gx = px(state.goal[xk]), gy = py(state.goal[yk]);
-  if (nx !== gx || ny !== gy)
-    s += `<line x1="${nx}" y1="${ny}" x2="${gx}" y2="${gy}" stroke="${goal}" stroke-width="1.5" stroke-dasharray="4 3"/>`;
-  const paper = cssv("--paper");
-  s += `<g pointer-events="none">`;   // 目印が下の点のクリックを奪わないように
-  s += `<circle cx="${nx}" cy="${ny}" r="11" fill="none" stroke="${paper}" stroke-width="6" opacity=".9"/>`;
-  s += `<circle cx="${nx}" cy="${ny}" r="11" fill="none" stroke="${now}" stroke-width="2.5"><title>現状</title></circle>`;
-  s += `<rect x="${gx - 9}" y="${gy - 9}" width="18" height="18" fill="${paper}" opacity=".9"/>`;
-  s += `<rect x="${gx - 7}" y="${gy - 7}" width="14" height="14" fill="${goal}"><title>目標</title></rect>`;
-  const same = nx === gx && ny === gy;
-  (same ? [[nx, ny, "現状＝目標", cssv("--ink-2"), 62]]
-        : [[nx, ny, "現状", now, 27], [gx, gy, "目標", goal, 27]]).forEach(([x, y, t, c, w2]) => {
-    s += `<rect x="${x + 13}" y="${y - 8}" width="${w2}" height="15" rx="3" fill="${paper}" opacity=".85"/>`
-      +  `<text x="${x + 16}" y="${y + 4}" font-size="10.5" fill="${c}" font-family="sans-serif">${t}</text>`;
-  });
-  s += `</g>`;
-
+  const ks = mapAxes();
   const svg = $("map");
   if (!svg.dataset.ready){
     svg.insertAdjacentHTML("afterbegin",
-      `<defs>${CHAIRS.map(c => `<image id="ci-${c.id}" href="${c.src}" x="0" y="0" width="20" height="20" `
-        + `preserveAspectRatio="xMidYMid slice"/>`).join("")}</defs><g id="map-layer"></g>`);
-    svg.insertAdjacentHTML("beforeend", `<g id="map-hover" pointer-events="none"></g>`);
+      `<defs><clipPath id="map-clip"><rect x="${PAD.L}" y="${PAD.T}" `
+      + `width="${MAP_W - PAD.L - PAD.R}" height="${MAP_H - PAD.T - PAD.B}"/></clipPath>`
+      + CHAIRS.map(c => `<image id="ci-${c.id}" href="${c.src}" x="0" y="0" width="20" height="20" `
+        + `preserveAspectRatio="xMidYMid slice"/>`).join("")
+      + `</defs><g id="map-layer"></g><g id="map-hover" pointer-events="none"></g>`);
     svg.dataset.ready = "1";
-    svg.addEventListener("click", e => {
-      const g2 = e.target.closest("[data-idx]");
-      if (g2) useChair(+g2.dataset.idx);
-    });
-    svg.addEventListener("mousemove", e => {
-      const t = e.target.closest("[data-i]");
-      mapPreview(t ? +t.dataset.i : null);
-    });
-    svg.addEventListener("mouseleave", () => mapPreview(null));
+    bindMap(svg);
   }
-  svg.querySelector("#map-layer").innerHTML = s;
+  svg.querySelector("#map-layer").innerHTML =
+    ks.length >= 3 ? mapScene3D(ks, items) : mapScene2D(ks, items);
   mapPreview(null);
 
   // 凡例
   const cats = catsOf(id);
+  const heat = ks.length >= 3 ? "" :
+    `<div class="heatkey"><span>密度</span><i></i><span>少</span><span>多</span></div>`;
   $("map-legend").innerHTML = cats.map(([c, ci]) => {
     const n = all.filter(it => it.cat === c).length;
     return `<button type="button" data-cat="${c}" aria-pressed="${!state.catOff.has(c)}">`
       + `<i style="background:${CAT_COLORS[(ci || 0) % CAT_COLORS.length]}"></i>${c}<b>${n}</b></button>`;
-  }).join("");
+  }).join("") + heat;
+  const key = $("map-legend").querySelector(".heatkey i");
+  if (key) key.style.background = `linear-gradient(90deg, ${HEAT.join(",")})`;
   $("map-legend").querySelectorAll("button").forEach(b => b.addEventListener("click", () => {
     const c = b.dataset.cat;
     state.catOff.has(c) ? state.catOff.delete(c) : state.catOff.add(c);
@@ -1844,12 +1807,322 @@ function drawMap(){
 
   $("corpus-cap").textContent = state.chairLoading && id === "chair"
     ? "実写サンプルを解析中…"
-    : `${all.length}件／${cats.length}群（表示 ${items.length}件）`;
+    : `${all.length}件／${cats.length}群（表示 ${items.length}件）・${ks.length}軸`
+      + (ks.length >= 3 ? "（立体・ドラッグで回転）" : `（拡大 ${state.mapView.k.toFixed(1)}倍）`);
   $("research-note").textContent = id === "chair" && CHAIRS.length
-    ? "実写サンプル30点を9項目に自動推定し、クラスタリングで群に分けたもの。点をクリックするとその一脚が「現状」になります。"
-      + "収集そのもの（Amazon・画像検索）は外側のパイプラインの仕事で、ここは受け皿。「画像から追加」で同じ座標系に足せます。"
-    : "Amazonや画像検索からの収集は外側のパイプラインで行い、ここは受け皿。この対象の初期値は各カテゴリの代表プロファイルから生成した合成コーパスで、"
-      + "「画像から追加」で集めた画像を放り込むと自動推定で同じ座標系に乗ります。";
+    ? "実写サンプル30点を9項目に自動推定し、クラスタリングで群に分けたもの。点にホバーすると写真が開き、クリックするとその一脚が「現状」になります。"
+      + "軸は1〜3項目まで選べ、3つ選ぶと立体表示になります。ホイールで拡大、ドラッグで移動（立体では回転）。"
+    : "Amazonや画像検索からの収集は外側のパイプラインで行い、ここは受け皿。この対象の初期値は合成コーパスで、「画像から追加」で同じ座標系に乗ります。"
+      + "軸は1〜3項目まで選べ、3つ選ぶと立体表示になります。";
+}
+
+/* ── 1軸・2軸（平面） ── */
+function mapScene2D(ks, items){
+  const V2 = state.mapView, one = ks.length === 1;
+  const x0 = PAD.L, x1 = MAP_W - PAD.R, y0 = PAD.T, y1 = MAP_H - PAD.B;
+  const cx = (x0 + x1) / 2, cy = (y0 + y1) / 2;
+  const IN = 22;   // 端の点が枠に食い込まないための余白
+  const bx = v => x0 + IN + (v - 1) / 4 * (x1 - x0 - IN * 2);
+  const by = v => y1 - IN - (v - 1) / 4 * (y1 - y0 - IN * 2);
+  const px = v => cx + (bx(v) - cx) * V2.k + V2.tx;
+  const py = v => cy + (by(v) - cy) * V2.k + V2.ty;
+  const line = cssv("--line"), soft = cssv("--line-soft"), ink3 = cssv("--ink-3"), ink2 = cssv("--ink-2");
+  const now = cssv("--now"), goal = cssv("--goal"), paper = cssv("--paper");
+  const [xk, yk] = ks;
+  let plot = "";
+
+  // 密度
+  const cells = new Float64Array(HEAT_N * (one ? 1 : HEAT_N));
+  const bin = v => Math.max(0, Math.min(HEAT_N - 1, Math.round((v - 1) / 4 * (HEAT_N - 1))));
+  items.forEach(it => {
+    const i = bin(it.p[xk]), j = one ? 0 : bin(it.p[yk]);
+    cells[j * HEAT_N + i]++;
+  });
+  const mx = Math.max(1, ...cells);
+  const step = 4 / (HEAT_N - 1);
+  for (let j = 0; j < (one ? 1 : HEAT_N); j++) for (let i = 0; i < HEAT_N; i++){
+    const n = cells[j * HEAT_N + i];
+    if (!n) continue;
+    const cv = k => 1 + k * 4 / (HEAT_N - 1);
+    const cx0 = px(cv(i) - step / 2), cx1 = px(cv(i) + step / 2);
+    const cy0 = one ? cy - 150 : py(cv(j) + step / 2), cy1 = one ? cy + 150 : py(cv(j) - step / 2);
+    plot += `<rect x="${cx0.toFixed(1)}" y="${cy0.toFixed(1)}" width="${(cx1-cx0).toFixed(1)}" `
+      + `height="${(cy1-cy0).toFixed(1)}" fill="${heatColor(n / mx)}" fill-opacity="${one ? .32 : .55}"/>`;
+  }
+  // 最も広い空白（占有セルから最も遠い空きセル）を1つだけ示す
+  if (!one){
+    let best = null, bd = -1;
+    for (let j = 0; j < HEAT_N; j++) for (let i = 0; i < HEAT_N; i++){
+      if (cells[j * HEAT_N + i]) continue;
+      let d = 1e9;
+      for (let b = 0; b < HEAT_N; b++) for (let a = 0; a < HEAT_N; a++)
+        if (cells[b * HEAT_N + a]) d = Math.min(d, Math.hypot(a - i, b - j));
+      if (d > bd){ bd = d; best = [i, j]; }
+    }
+    if (best && bd >= 2){
+      const tx2 = px(1 + best[0] * 4 / (HEAT_N - 1)), ty2 = py(1 + best[1] * 4 / (HEAT_N - 1));
+      plot += `<text x="${tx2.toFixed(1)}" y="${ty2.toFixed(1)}" font-size="11" fill="${ink3}" `
+        + `text-anchor="middle" font-family="sans-serif">空白</text>`;
+    }
+  }
+
+  // 方眼紙のようなドットグリッド（拡大に応じて目が細かくなる）
+  const perUnit = (x1 - x0) / 4 * V2.k;
+  const gstep = [1, .5, .25, .125, .0625].find(g => g * perUnit <= 30) || .0625;
+  const dots = [];
+  for (let v = 1; v <= 5.0001; v += gstep) dots.push(Math.round(v * 10000) / 10000);
+  dots.forEach(vx => {
+    const X = px(vx); if (X < x0 - 2 || X > x1 + 2) return;
+    const majX = Math.abs(vx - Math.round(vx)) < 1e-6;
+    if (one){
+      for (let Y = y0 + 12; Y < y1; Y += 26)
+        plot += `<circle cx="${X.toFixed(1)}" cy="${Y.toFixed(1)}" r="${majX ? 1.7 : 1}" fill="${majX ? line : soft}"/>`;
+      return;
+    }
+    dots.forEach(vy => {
+      const Y = py(vy); if (Y < y0 - 2 || Y > y1 + 2) return;
+      const maj = majX && Math.abs(vy - Math.round(vy)) < 1e-6;
+      plot += `<circle cx="${X.toFixed(1)}" cy="${Y.toFixed(1)}" r="${maj ? 1.7 : 1}" fill="${maj ? line : soft}"/>`;
+    });
+  });
+  if (one) plot += `<line x1="${x0}" y1="${cy.toFixed(1)}" x2="${x1}" y2="${cy.toFixed(1)}" stroke="${soft}" stroke-width="1"/>`;
+
+  // 点
+  const pos = [];
+  const groups = new Map();
+  items.forEach(it => {
+    const key = one ? `${it.p[xk]}` : `${it.p[xk]}_${it.p[yk]}`;
+    if (!groups.has(key)) groups.set(key, []);
+    groups.get(key).push(it);
+  });
+  const zk = Math.min(2, V2.k), size = 20 * zk;
+  groups.forEach(list => {
+    const cols = one ? 1 : Math.ceil(Math.sqrt(list.length)), rows = Math.ceil(list.length / cols);
+    list.forEach((it, i) => {
+      const gap = (it.imgId ? size + 1 : 13) * (one ? 1 : 1);
+      const x = px(it.p[xk]) + (one ? 0 : (i % cols - (cols - 1) / 2) * gap);
+      const y = one ? cy - (i - (list.length - 1) / 2) * gap
+                    : py(it.p[yk]) + (Math.floor(i / cols) - (rows - 1) / 2) * gap;
+      pos.push({ it, x, y });
+      plot += mapMark(it, x, y, pos.length - 1, size, paper);
+    });
+  });
+  state.mapPos = pos;
+
+  // 市場の重心とばらつき
+  if (items.length){
+    const mean = k => items.reduce((t, it) => t + it.p[k], 0) / items.length;
+    const sd = (k, m) => Math.sqrt(items.reduce((t, it) => t + (it.p[k] - m) ** 2, 0) / items.length);
+    const mxv = mean(xk), sxv = sd(xk, mxv);
+    const myv = one ? 3 : mean(yk), syv = one ? 0 : sd(yk, myv);
+    const gxc = px(mxv), gyc = one ? cy : py(myv);
+    const rx = Math.abs(px(1 + sxv) - px(1)), ry = one ? 16 : Math.abs(py(1 + syv) - py(1));
+    plot += `<g pointer-events="none">`
+      + `<ellipse cx="${gxc.toFixed(1)}" cy="${gyc.toFixed(1)}" rx="${Math.max(6, rx).toFixed(1)}" `
+      + `ry="${Math.max(6, ry).toFixed(1)}" fill="${ink3}" fill-opacity=".05" stroke="${ink3}" `
+      + `stroke-width="1" stroke-dasharray="3 3"/>`
+      + `<line x1="${(gxc-8).toFixed(1)}" y1="${gyc.toFixed(1)}" x2="${(gxc+8).toFixed(1)}" y2="${gyc.toFixed(1)}" stroke="${ink2}" stroke-width="2"/>`
+      + `<line x1="${gxc.toFixed(1)}" y1="${(gyc-8).toFixed(1)}" x2="${gxc.toFixed(1)}" y2="${(gyc+8).toFixed(1)}" stroke="${ink2}" stroke-width="2"/>`
+      + `<rect x="${(gxc+10).toFixed(1)}" y="${(gyc-20).toFixed(1)}" width="94" height="16" rx="3" fill="${paper}" opacity=".85"/>`
+      + `<text x="${(gxc+14).toFixed(1)}" y="${(gyc-8).toFixed(1)}" font-size="11" fill="${ink2}" font-family="sans-serif">`
+      + `市場の重心 ${fmt(Math.round(mxv*10)/10)}${one ? "" : " / " + fmt(Math.round(myv*10)/10)}</text></g>`;
+  }
+
+  // 現状・目標
+  const nx = px(state.now[xk]), ny = one ? cy : py(state.now[yk]);
+  const gx = px(state.goal[xk]), gy = one ? cy : py(state.goal[yk]);
+  plot += `<g pointer-events="none">`;
+  if (nx !== gx || ny !== gy)
+    plot += `<line x1="${nx}" y1="${ny}" x2="${gx}" y2="${gy}" stroke="${goal}" stroke-width="1.5" stroke-dasharray="4 3"/>`;
+  plot += marker(nx, ny, gx, gy, now, goal, paper, ink2);
+  plot += `</g>`;
+
+  // 軸の見出し（項目名と両端の意味）
+  let s = `<g clip-path="url(#map-clip)">${plot}</g>`;
+  s += `<rect x="${x0}" y="${y0}" width="${x1-x0}" height="${y1-y0}" fill="none" stroke="${line}" rx="4"/>`;
+  [1,2,3,4,5].forEach(v => {
+    const tx2 = px(v), ty2 = one ? cy : py(v);
+    if (tx2 > x0 - 1 && tx2 < x1 + 1)
+      s += `<text x="${tx2.toFixed(1)}" y="${y1 + 16}" font-size="11" fill="${ink3}" text-anchor="middle" font-family="monospace">${v}</text>`;
+    if (!one && ty2 > y0 - 1 && ty2 < y1 + 1)
+      s += `<text x="${x0 - 10}" y="${(ty2 + 4).toFixed(1)}" font-size="11" fill="${ink3}" text-anchor="end" font-family="monospace">${v}</text>`;
+  });
+  const ax = AX[xk];
+  s += `<text x="${x0}" y="${y1 + 38}" font-size="12.5" fill="${ink2}" font-family="sans-serif">`
+    + `<tspan font-weight="600">横軸 ${ax.name}</tspan><tspan fill="${ink3}">　${ax.low || "低"} → ${ax.high || "高"}</tspan></text>`;
+  if (!one){
+    const ay = AX[yk];
+    s += `<text transform="rotate(-90 ${x0 - 34} ${y1})" x="${x0 - 34}" y="${y1}" font-size="12.5" fill="${ink2}" font-family="sans-serif">`
+      + `<tspan font-weight="600">縦軸 ${ay.name}</tspan><tspan fill="${ink3}">　${ay.low || "低"} → ${ay.high || "高"}</tspan></text>`;
+  } else {
+    s += `<text x="${x0}" y="${y0 - 8}" font-size="12" fill="${ink3}" font-family="sans-serif">1軸表示（同じ値は縦に積んでいます）</text>`;
+  }
+  return s;
+}
+
+/* ── 3軸（立体） ── */
+function mapScene3D(ks, items){
+  const M = state.map3, [xk, yk, zk] = ks;
+  const cx = MAP_W / 2, cy = MAP_H / 2 + 6, f = 620 * M.k, dist = 4.6;
+  const yaw = M.yaw * Math.PI / 180, pitch = M.pitch * Math.PI / 180;
+  const cyw = Math.cos(yaw), syw = Math.sin(yaw), cpi = Math.cos(pitch), spi = Math.sin(pitch);
+  const cam = p => {
+    let [x, y, z] = p;
+    [x, z] = [x * cyw + z * syw, -x * syw + z * cyw];
+    [y, z] = [y * cpi - z * spi, y * spi + z * cpi];
+    return [x, y, z];
+  };
+  const proj = p => { const k = f / (dist - p[2]); return [cx + p[0] * k, cy - p[1] * k, p[2]]; };
+  const at = (a, b, c) => proj(cam([(a - 3) / 2, (b - 3) / 2, (c - 3) / 2]));
+  const line = cssv("--line"), soft = cssv("--line-soft"), ink3 = cssv("--ink-3"), ink2 = cssv("--ink-2");
+  const now = cssv("--now"), goal = cssv("--goal"), paper = cssv("--paper");
+  let s = "";
+
+  // 立方体の枠
+  const C = [[1,1,1],[5,1,1],[5,5,1],[1,5,1],[1,1,5],[5,1,5],[5,5,5],[1,5,5]].map(v => at(...v));
+  [[0,1],[1,2],[2,3],[3,0],[4,5],[5,6],[6,7],[7,4],[0,4],[1,5],[2,6],[3,7]].forEach(([a, b]) => {
+    s += `<line x1="${C[a][0].toFixed(1)}" y1="${C[a][1].toFixed(1)}" x2="${C[b][0].toFixed(1)}" y2="${C[b][1].toFixed(1)}" `
+      + `stroke="${soft}" stroke-width="1"/>`;
+  });
+  // 3本の軸と見出し
+  [[xk, [5,1,1], "横"], [yk, [1,5,1], "縦"], [zk, [1,1,5], "奥行き"]].forEach(([k, end, label]) => {
+    const o = at(1,1,1), e = at(...end);
+    s += `<line x1="${o[0].toFixed(1)}" y1="${o[1].toFixed(1)}" x2="${e[0].toFixed(1)}" y2="${e[1].toFixed(1)}" `
+      + `stroke="${line}" stroke-width="1.8"/>`;
+    const lx = e[0] + (e[0] - o[0]) * .08, ly = e[1] + (e[1] - o[1]) * .08;
+    s += `<rect x="${(lx - 6).toFixed(1)}" y="${(ly - 13).toFixed(1)}" width="${(AX[k].name.length * 12 + 34)}" height="18" rx="3" fill="${paper}" opacity=".9"/>`
+      + `<text x="${lx.toFixed(1)}" y="${ly.toFixed(1)}" font-size="12" font-family="sans-serif" fill="${ink2}">`
+      + `<tspan fill="${ink3}">${label} </tspan><tspan font-weight="600">${AX[k].name}</tspan></text>`;
+  });
+
+  // 点（奥から手前へ）
+  const pos = [];
+  const drawn = items.map(it => {
+    const p = at(it.p[xk], it.p[yk], it.p[zk]);
+    return { it, x:p[0], y:p[1], z:p[2] };
+  }).sort((a, b) => a.z - b.z);
+  drawn.forEach(d => {
+    const scale = Math.max(.55, Math.min(1.7, 1 / (dist - d.z) * 3.1)) * M.k;
+    pos.push({ it:d.it, x:d.x, y:d.y });
+    s += mapMark(d.it, d.x, d.y, pos.length - 1, 20 * scale, paper);
+  });
+  state.mapPos = pos;
+
+  if (items.length){
+    const mean = k => items.reduce((t, it) => t + it.p[k], 0) / items.length;
+    const mv = [mean(xk), mean(yk), mean(zk)];
+    const c3 = at(...mv);
+    s += `<g pointer-events="none">`
+      + `<circle cx="${c3[0].toFixed(1)}" cy="${c3[1].toFixed(1)}" r="13" fill="${ink3}" fill-opacity=".10" stroke="${ink3}" stroke-dasharray="3 3"/>`
+      + `<line x1="${(c3[0]-8).toFixed(1)}" y1="${c3[1].toFixed(1)}" x2="${(c3[0]+8).toFixed(1)}" y2="${c3[1].toFixed(1)}" stroke="${ink2}" stroke-width="2"/>`
+      + `<line x1="${c3[0].toFixed(1)}" y1="${(c3[1]-8).toFixed(1)}" x2="${c3[0].toFixed(1)}" y2="${(c3[1]+8).toFixed(1)}" stroke="${ink2}" stroke-width="2"/>`
+      + `<rect x="${(c3[0]+10).toFixed(1)}" y="${(c3[1]-20).toFixed(1)}" width="66" height="16" rx="3" fill="${paper}" opacity=".85"/>`
+      + `<text x="${(c3[0]+14).toFixed(1)}" y="${(c3[1]-8).toFixed(1)}" font-size="11" fill="${ink2}" font-family="sans-serif">市場の重心</text></g>`;
+  }
+
+  const n3 = at(state.now[xk], state.now[yk], state.now[zk]);
+  const g3 = at(state.goal[xk], state.goal[yk], state.goal[zk]);
+  s += `<g pointer-events="none">`;
+  if (n3[0] !== g3[0] || n3[1] !== g3[1])
+    s += `<line x1="${n3[0]}" y1="${n3[1]}" x2="${g3[0]}" y2="${g3[1]}" stroke="${goal}" stroke-width="1.5" stroke-dasharray="4 3"/>`;
+  s += marker(n3[0], n3[1], g3[0], g3[1], now, goal, paper, ink2) + `</g>`;
+  return s;
+}
+
+/* 点そのもの（実写は写真、合成は円） */
+function mapMark(it, x, y, i, size, paper){
+  const col = CAT_COLORS[(it.ci || 0) % CAT_COLORS.length], h = size / 2;
+  if (it.imgId)
+    return `<g data-i="${i}" data-idx="${it.idx}" style="cursor:pointer">`
+      + `<rect x="${(x-h-1.5).toFixed(1)}" y="${(y-h-1.5).toFixed(1)}" width="${size+3}" height="${size+3}" rx="3" fill="${paper}"/>`
+      + `<use href="#${it.imgId}" x="${(x-h).toFixed(1)}" y="${(y-h).toFixed(1)}" width="${size}" height="${size}"/>`
+      + `<rect x="${(x-h).toFixed(1)}" y="${(y-h).toFixed(1)}" width="${size}" height="${size}" fill="none" `
+      + `stroke="${col}" stroke-width="1.8"/></g>`;
+  return `<circle data-i="${i}" cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="${(size*.3).toFixed(1)}" fill="${col}" `
+    + `fill-opacity="${it.src === "合成" ? .65 : .9}" stroke="${paper}" stroke-width="2"/>`;
+}
+
+/* 現状・目標の目印 */
+function marker(nx, ny, gx, gy, now, goal, paper, ink2){
+  let s = `<circle cx="${nx}" cy="${ny}" r="11" fill="none" stroke="${paper}" stroke-width="6" opacity=".9"/>`
+    + `<circle cx="${nx}" cy="${ny}" r="11" fill="none" stroke="${now}" stroke-width="2.5"/>`
+    + `<rect x="${gx - 9}" y="${gy - 9}" width="18" height="18" rx="3" fill="${paper}" opacity=".9"/>`
+    + `<rect x="${gx - 7}" y="${gy - 7}" width="14" height="14" rx="2" fill="${goal}"/>`;
+  const same = Math.abs(nx - gx) < .5 && Math.abs(ny - gy) < .5;
+  (same ? [[nx, ny, "現状＝目標", ink2, 66]] : [[nx, ny, "現状", now, 30], [gx, gy, "目標", goal, 30]])
+    .forEach(([x, y, t, c, w]) => {
+      s += `<rect x="${x + 13}" y="${y - 8}" width="${w}" height="16" rx="3" fill="${paper}" opacity=".85"/>`
+        + `<text x="${x + 17}" y="${y + 4}" font-size="11" fill="${c}" font-family="sans-serif">${t}</text>`;
+    });
+  return s;
+}
+
+/* ── 拡大・移動・回転 ── */
+function mapReset(){
+  state.mapView = { k:1, tx:0, ty:0 };
+  state.map3 = { yaw:-32, pitch:-18, k:1 };
+  drawMap();
+}
+function mapZoom(mul, cxp, cyp){
+  if (mapAxes().length >= 3){
+    state.map3.k = Math.max(.6, Math.min(3, state.map3.k * mul));
+  } else {
+    const V2 = state.mapView, k2 = Math.max(1, Math.min(8, V2.k * mul));
+    if (cxp != null){
+      V2.tx = cxp - (cxp - V2.tx) * (k2 / V2.k) + (MAP_W / 2) * 0;
+      V2.ty = cyp - (cyp - V2.ty) * (k2 / V2.k);
+    }
+    V2.k = k2;
+    if (k2 === 1){ V2.tx = 0; V2.ty = 0; }
+  }
+  drawMap();
+}
+function bindMap(svg){
+  const toSvg = e => {
+    const r = svg.getBoundingClientRect();
+    return [(e.clientX - r.left) / r.width * MAP_W, (e.clientY - r.top) / r.height * MAP_H];
+  };
+  svg.addEventListener("click", e => {
+    if (state.mapDragged) return;
+    const g = e.target.closest("[data-idx]");
+    if (g) useChair(+g.dataset.idx);
+  });
+  svg.addEventListener("mousemove", e => {
+    if (state.mapDrag) return;
+    const t = e.target.closest("[data-i]");
+    mapPreview(t ? +t.dataset.i : null);
+  });
+  svg.addEventListener("mouseleave", () => mapPreview(null));
+  svg.addEventListener("wheel", e => {
+    e.preventDefault();
+    const [sx, sy] = toSvg(e);
+    mapZoom(Math.exp(-e.deltaY * .0016), sx, sy);
+  }, { passive:false });
+  svg.addEventListener("pointerdown", e => {
+    e.preventDefault();
+    const [sx, sy] = toSvg(e);
+    state.mapDrag = { sx, sy, tx:state.mapView.tx, ty:state.mapView.ty,
+                      yaw:state.map3.yaw, pitch:state.map3.pitch };
+    state.mapDragged = false;
+    svg.setPointerCapture(e.pointerId);
+  });
+  svg.addEventListener("pointermove", e => {
+    const d = state.mapDrag; if (!d) return;
+    const [sx, sy] = toSvg(e);
+    if (Math.abs(sx - d.sx) + Math.abs(sy - d.sy) > 4) state.mapDragged = true;
+    if (mapAxes().length >= 3){
+      state.map3.yaw = d.yaw + (sx - d.sx) * .45;
+      state.map3.pitch = Math.max(-70, Math.min(70, d.pitch - (sy - d.sy) * .35));
+    } else {
+      state.mapView.tx = d.tx + (sx - d.sx);
+      state.mapView.ty = d.ty + (sy - d.sy);
+    }
+    if (state.mapDragged) drawMap();
+  });
+  ["pointerup", "pointercancel"].forEach(t => svg.addEventListener(t, () => {
+    state.mapDrag = null;
+    setTimeout(() => state.mapDragged = false, 0);
+  }));
 }
 
 /* ホバー中の一点を大きく見せる（Notion のプレビュー相当） */
@@ -1920,6 +2193,130 @@ function addImagesToCorpus(files){
   });
 }
 
+
+/* ── コンセプト：市場マップ上でグリッドを切り、狙う領域を指定する ── */
+function fillConceptSelects(){
+  [["c-x", "form"], ["c-y", "color"]].forEach(([id, def]) => {
+    const s = $(id);
+    if (s.options.length) return;
+    AXES.forEach(a => s.add(new Option(a.name, a.key)));
+    s.value = def;
+  });
+}
+const conceptAxes = () => [$("c-x").value, $("c-y").value];
+
+function drawConceptMap(){
+  const items = visibleCorpus();
+  const [xk, yk] = conceptAxes();
+  const N = +$("c-grid").value;
+  const W = 680, H = 430, L = 74, R = 22, T = 22, B = 58, IN = 16;
+  const x0 = L, x1 = W - R, y0 = T, y1 = H - B;
+  const px = v => x0 + IN + (v - 1) / 4 * (x1 - x0 - IN * 2);
+  const py = v => y1 - IN - (v - 1) / 4 * (y1 - y0 - IN * 2);
+  const line = cssv("--line"), soft = cssv("--line-soft"), ink3 = cssv("--ink-3"), ink2 = cssv("--ink-2");
+  const now = cssv("--now"), goal = cssv("--goal"), paper = cssv("--paper");
+  const edge = k => 1 + k * 4 / N;
+
+  // セルごとの競合数
+  const cnt = Array.from({ length: N * N }, () => 0);
+  const cellOf = v => Math.max(0, Math.min(N - 1, Math.floor((v - 1) / 4 * N)));
+  items.forEach(it => cnt[cellOf(it.p[yk]) * N + cellOf(it.p[xk])]++);
+  const mx = Math.max(1, ...cnt);
+
+  let s = "";
+  // 方眼のドット
+  for (let v = 1; v <= 5.001; v += .25){
+    for (let u = 1; u <= 5.001; u += .25){
+      const maj = Math.abs(u - Math.round(u)) < 1e-6 && Math.abs(v - Math.round(v)) < 1e-6;
+      s += `<circle cx="${px(u).toFixed(1)}" cy="${py(v).toFixed(1)}" r="${maj ? 1.5 : .9}" fill="${maj ? line : soft}"/>`;
+    }
+  }
+  // セル
+  const sel = state.region && state.region.xk === xk && state.region.yk === yk && state.region.n === N ? state.region : null;
+  for (let j = 0; j < N; j++) for (let i = 0; i < N; i++){
+    const n = cnt[j * N + i];
+    const cx0 = px(edge(i)), cx1 = px(edge(i + 1)), cy1 = py(edge(j)), cy0 = py(edge(j + 1));
+    const on = sel && sel.i === i && sel.j === j;
+    s += `<g data-cell="${i},${j}" style="cursor:pointer">`
+      + `<rect x="${cx0.toFixed(1)}" y="${cy0.toFixed(1)}" width="${(cx1-cx0).toFixed(1)}" height="${(cy1-cy0).toFixed(1)}" `
+      + `fill="${n ? heatColor(n / mx) : "transparent"}" fill-opacity="${n ? .42 : 1}" `
+      + `stroke="${on ? goal : line}" stroke-width="${on ? 2.5 : 1}"/>`
+      + `<text x="${(cx0+6).toFixed(1)}" y="${(cy0+15).toFixed(1)}" font-size="10.5" font-family="monospace" `
+      + `fill="${ink3}">${n}</text></g>`;
+  }
+  // 競合
+  items.forEach(it => {
+    const col = CAT_COLORS[(it.ci || 0) % CAT_COLORS.length];
+    s += `<circle cx="${px(it.p[xk]).toFixed(1)}" cy="${py(it.p[yk]).toFixed(1)}" r="4.5" fill="${col}" `
+      + `fill-opacity=".85" stroke="${paper}" stroke-width="1.5" pointer-events="none"/>`;
+  });
+  // 市場の重心
+  const mean = k => items.length ? items.reduce((t, it) => t + it.p[k], 0) / items.length : 3;
+  const mxv = mean(xk), myv = mean(yk), gx0 = px(mxv), gy0 = py(myv);
+  s += `<g pointer-events="none">`
+    + `<line x1="${(gx0-9).toFixed(1)}" y1="${gy0.toFixed(1)}" x2="${(gx0+9).toFixed(1)}" y2="${gy0.toFixed(1)}" stroke="${ink2}" stroke-width="2"/>`
+    + `<line x1="${gx0.toFixed(1)}" y1="${(gy0-9).toFixed(1)}" x2="${gx0.toFixed(1)}" y2="${(gy0+9).toFixed(1)}" stroke="${ink2}" stroke-width="2"/>`
+    + `<rect x="${(gx0+11).toFixed(1)}" y="${(gy0-19).toFixed(1)}" width="72" height="16" rx="3" fill="${paper}" opacity=".85"/>`
+    + `<text x="${(gx0+15).toFixed(1)}" y="${(gy0-7).toFixed(1)}" font-size="11" fill="${ink2}" font-family="sans-serif">市場の重心</text>`;
+  // 重心 → 狙う領域
+  if (sel){
+    const tx = px(sel.cx), ty = py(sel.cy);
+    s += `<line x1="${gx0.toFixed(1)}" y1="${gy0.toFixed(1)}" x2="${tx.toFixed(1)}" y2="${ty.toFixed(1)}" `
+      + `stroke="${goal}" stroke-width="2" stroke-dasharray="5 3"/>`
+      + `<circle cx="${tx.toFixed(1)}" cy="${ty.toFixed(1)}" r="6" fill="${goal}"/>`;
+  }
+  // 現状
+  s += `<circle cx="${px(state.now[xk]).toFixed(1)}" cy="${py(state.now[yk]).toFixed(1)}" r="10" fill="none" stroke="${paper}" stroke-width="5"/>`
+    + `<circle cx="${px(state.now[xk]).toFixed(1)}" cy="${py(state.now[yk]).toFixed(1)}" r="10" fill="none" stroke="${now}" stroke-width="2.5"/>`
+    + `<rect x="${(px(state.now[xk])+12).toFixed(1)}" y="${(py(state.now[yk])-8).toFixed(1)}" width="30" height="16" rx="3" fill="${paper}" opacity=".85"/>`
+    + `<text x="${(px(state.now[xk])+16).toFixed(1)}" y="${(py(state.now[yk])+4).toFixed(1)}" font-size="11" fill="${now}" font-family="sans-serif">現状</text></g>`;
+  // 枠と軸
+  s += `<rect x="${x0}" y="${y0}" width="${x1-x0}" height="${y1-y0}" fill="none" stroke="${line}" rx="4"/>`;
+  [1,2,3,4,5].forEach(v => {
+    s += `<text x="${px(v).toFixed(1)}" y="${y1+16}" font-size="11" fill="${ink3}" text-anchor="middle" font-family="monospace">${v}</text>`
+      + `<text x="${x0-10}" y="${(py(v)+4).toFixed(1)}" font-size="11" fill="${ink3}" text-anchor="end" font-family="monospace">${v}</text>`;
+  });
+  const ax = AX[xk], ay = AX[yk];
+  s += `<text x="${x0}" y="${y1+38}" font-size="12.5" fill="${ink2}" font-family="sans-serif">`
+    + `<tspan font-weight="600">横軸 ${ax.name}</tspan><tspan fill="${ink3}">　${ax.low || "低"} → ${ax.high || "高"}</tspan></text>`
+    + `<text transform="rotate(-90 ${x0-36} ${y1})" x="${x0-36}" y="${y1}" font-size="12.5" fill="${ink2}" font-family="sans-serif">`
+    + `<tspan font-weight="600">縦軸 ${ay.name}</tspan><tspan fill="${ink3}">　${ay.low || "低"} → ${ay.high || "高"}</tspan></text>`;
+
+  const svg = $("cmap");
+  svg.innerHTML = s;
+  if (!svg.dataset.ready){
+    svg.dataset.ready = "1";
+    svg.addEventListener("click", e => {
+      const g = e.target.closest("[data-cell]");
+      if (!g) return;
+      const [i, j] = g.dataset.cell.split(",").map(Number);
+      pickRegion(i, j);
+    });
+  }
+
+  // 領域の説明
+  const note = $("c-region");
+  if (sel){
+    const dir = (v, m, a) => v > m + .15 ? `${a.high || "高"}側へ +${fmt(Math.round((v-m)*10)/10)}`
+              : v < m - .15 ? `${a.low || "低"}側へ −${fmt(Math.round((m-v)*10)/10)}` : "重心と同じ";
+    note.innerHTML = `狙う領域：<b>${ax.name} ${fmt(sel.x0)}〜${fmt(sel.x1)}／${ay.name} ${fmt(sel.y0)}〜${fmt(sel.y1)}</b>`
+      + `（競合 ${cnt[sel.j * N + sel.i]}件）<br>市場の重心（${ax.name} ${fmt(Math.round(mxv*10)/10)}／${ay.name} ${fmt(Math.round(myv*10)/10)}）から見て、`
+      + `${ax.name}は${dir(sel.cx, mxv, ax)}、${ay.name}は${dir(sel.cy, myv, ay)}。`;
+  } else {
+    note.textContent = "セルをクリックすると、その領域が目標になります。数字はその領域にいる競合の数で、色が濃いほど混んでいます。";
+  }
+}
+
+function pickRegion(i, j){
+  const [xk, yk] = conceptAxes(), N = +$("c-grid").value;
+  const e = k => 1 + k * 4 / N;
+  const x0 = e(i), x1 = e(i + 1), y0 = e(j), y1 = e(j + 1);
+  const cx = snap((x0 + x1) / 2), cy = snap((y0 + y1) / 2);
+  state.region = { i, j, n:N, xk, yk, x0, x1, y0, y1, cx, cy };
+  state.goal[xk] = cx; state.goal[yk] = cy;
+  drawAll();
+}
+
 /* ============================================================
    ② コンセプト ─ どの項目を伸ばすか
    score = 用途文脈での重要度 × 市場の空き × 伸びしろ
@@ -1987,6 +2384,10 @@ function drawAdvice(){
   const L = [];
   L.push(`■ コンセプト ─ ${p ? p.name : "対象"}（${p ? p.context : ""}）`);
   L.push(`市場：${items.length}件。最も混んでいるのは「${crowd ? crowd[0] : "─"}」（${crowd ? crowd[1] : 0}件）。`);
+  if (state.region){
+    const r = state.region;
+    L.push(`狙う領域：${AX[r.xk].name} ${fmt(r.x0)}〜${fmt(r.x1)}／${AX[r.yk].name} ${fmt(r.y0)}〜${fmt(r.y1)}`);
+  }
   L.push("");
   L.push("【伸ばす】");
   top.forEach((r, i) => L.push(`${i + 1}. ${r.a.name}　${fmt(state.now[r.key])}→${fmt(state.now[r.key] + r.step)}　${r.a.bUp || r.a.up}`));
@@ -2436,7 +2837,10 @@ document.querySelectorAll(".tab").forEach(b =>
 $("vis-3d").addEventListener("click", () => setVis("3d"));
 $("vis-img").addEventListener("click", () => setVis("img"));
 
-["map-x", "map-y"].forEach(id => $(id).addEventListener("change", drawMap));
+["map-x", "map-y", "map-z"].forEach(id => $(id).addEventListener("change", () => { mapReset(); }));
+$("map-zoom-in").addEventListener("click", () => mapZoom(1.35));
+$("map-zoom-out").addEventListener("click", () => mapZoom(1 / 1.35));
+$("map-reset").addEventListener("click", mapReset);
 $("btn-corpus-img").addEventListener("click", () => $("corpus-file").click());
 $("corpus-file").addEventListener("change", e => { addImagesToCorpus(e.target.files); e.target.value = ""; });
 $("btn-corpus-json").addEventListener("click", () => {
@@ -2451,6 +2855,8 @@ $("btn-corpus-json").addEventListener("click", () => {
   setTimeout(() => URL.revokeObjectURL(a.href), 4000);
 });
 
+["c-x", "c-y", "c-grid"].forEach(id => $(id).addEventListener("change", () => { state.region = null; drawAll(); }));
+$("c-clear").addEventListener("click", () => { state.region = null; drawAll(); });
 $("btn-adopt-all").addEventListener("click", () => {
   (state.advice || []).filter(r => !r.banned && r.step > 0).slice(0, 3)
     .forEach(r => state.goal[r.key] = Math.min(5, state.now[r.key] + r.step));
@@ -2507,9 +2913,8 @@ setMode("goal");
 buildAxes();
 buildPresets();
 fillAxisSelects();
-usePreset("glasses");
-state.goal.color = Math.min(5, state.now.color + 1);
-state.goal.matter = Math.min(5, state.now.matter + 1);
+fillConceptSelects();
+usePreset("chair");
 setTab("research");
 </script>
 </body>
