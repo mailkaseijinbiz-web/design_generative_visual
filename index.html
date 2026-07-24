@@ -7,7 +7,7 @@
 <style>
 :root{
   /* Notion 風のトークン：白地・淡い罫・青のアクセント */
-  --paper:#FFFFFF; --surface:#FFFFFF; --sub:#F7F6F3; --sunk:#F7F6F3;
+  --paper:#FFFFFF; --surface:#FFFFFF; --sub:#FFFFFF; --sunk:#F7F7F5;
   --line:rgba(55,53,47,.16); --line-soft:rgba(55,53,47,.09);
   --hover:rgba(55,53,47,.06);
   --ink:#37352F; --ink-2:#5F5C56; --ink-3:#9B9A97;
@@ -20,32 +20,8 @@
   --font-display:var(--font-ui);
   --font-mono:"SFMono-Regular",Menlo,Consolas,"Liberation Mono",monospace;
 }
-@media (prefers-color-scheme:dark){
-  :root{
-    --paper:#191919; --surface:#191919; --sub:#202020; --sunk:#252525;
-    --line:rgba(255,255,255,.14); --line-soft:rgba(255,255,255,.075);
-    --hover:rgba(255,255,255,.055);
-    --ink:#E9E9E7; --ink-2:#B4B3AE; --ink-3:#8C8B88;
-    --now:#529CCA; --goal:#D9A34A;
-    --pos:#4DAB9A; --neg:#FF7369;
-    --tint-now:rgba(82,156,202,.16); --tint-goal:rgba(217,163,74,.16);
-    --tint-warn:rgba(255,115,105,.12);
-    --shadow:0 1px 2px rgba(0,0,0,.4), 0 2px 8px rgba(0,0,0,.3);
-  }
-}
-:root[data-theme="dark"]{
-  --paper:#191919; --surface:#191919; --sub:#202020; --sunk:#252525;
-  --line:rgba(255,255,255,.14); --line-soft:rgba(255,255,255,.075);
-  --hover:rgba(255,255,255,.055);
-  --ink:#E9E9E7; --ink-2:#B4B3AE; --ink-3:#8C8B88;
-  --now:#529CCA; --goal:#D9A34A;
-  --pos:#4DAB9A; --neg:#FF7369;
-  --tint-now:rgba(82,156,202,.16); --tint-goal:rgba(217,163,74,.16);
-  --tint-warn:rgba(255,115,105,.12);
-  --shadow:0 1px 2px rgba(0,0,0,.4), 0 2px 8px rgba(0,0,0,.3);
-}
 :root[data-theme="light"]{
-  --paper:#FFFFFF; --surface:#FFFFFF; --sub:#F7F6F3; --sunk:#F7F6F3;
+  --paper:#FFFFFF; --surface:#FFFFFF; --sub:#FFFFFF; --sunk:#F7F7F5;
   --line:rgba(55,53,47,.16); --line-soft:rgba(55,53,47,.09);
   --hover:rgba(55,53,47,.06);
   --ink:#37352F; --ink-2:#5F5C56; --ink-3:#9B9A97;
@@ -117,7 +93,7 @@ button{cursor:pointer}
 .panel{display:flex; flex-direction:column; min-width:0}
 .deck.no-rail{grid-template-columns:minmax(0,1fr)}
 .deck.no-rail .panel.ledger{display:none}
-.panel.ledger{background:var(--sub); border-right:1px solid var(--line-soft)}
+.panel.ledger{background:var(--sub); border-right:1px solid var(--line)}
 .panel-head{
   display:flex; align-items:center; gap:10px; justify-content:space-between;
   padding:14px 18px 8px;
@@ -1768,6 +1744,50 @@ function mapAxes(){
   $("map-z").disabled = $("map-y").value === "-";
   return [...new Set([$("map-x").value, $("map-y").value, $("map-z").value].filter(k => k && k !== "-"))];
 }
+
+/* 密度を連続した場として描く（青一色の逐次配色）。SVGに画像として敷く */
+const HEAT_STOPS = [
+  [0,    [235,244,254],   0],
+  [.14,  [205,226,251],  62],
+  [.40,  [134,182,239], 112],
+  [.70,  [ 57,135,229], 146],
+  [1,    [ 37,106,191], 176]
+];
+function heatRGBA(t){
+  for (let i = 1; i < HEAT_STOPS.length; i++){
+    const [t1, c1, a1] = HEAT_STOPS[i], [t0, c0, a0] = HEAT_STOPS[i - 1];
+    if (t <= t1 || i === HEAT_STOPS.length - 1){
+      const u = t1 === t0 ? 0 : Math.max(0, Math.min(1, (t - t0) / (t1 - t0)));
+      return [c0[0] + (c1[0] - c0[0]) * u, c0[1] + (c1[1] - c0[1]) * u,
+              c0[2] + (c1[2] - c0[2]) * u, a0 + (a1 - a0) * u];
+    }
+  }
+  return [0, 0, 0, 0];
+}
+function heatURL(pts, w, h, r){
+  const cw = Math.max(40, Math.round(w / 4)), ch = Math.max(30, Math.round(h / 4));
+  const sx = cw / w, sy = ch / h, d = new Float32Array(cw * ch);
+  const rx = Math.max(2, r * sx), ry = Math.max(2, r * sy);
+  pts.forEach(p => {
+    const cx = p.x * sx, cy = p.y * sy;
+    const i0 = Math.max(0, Math.floor(cx - 3 * rx)), i1 = Math.min(cw - 1, Math.ceil(cx + 3 * rx));
+    const j0 = Math.max(0, Math.floor(cy - 3 * ry)), j1 = Math.min(ch - 1, Math.ceil(cy + 3 * ry));
+    for (let j = j0; j <= j1; j++) for (let i = i0; i <= i1; i++){
+      const dx = (i - cx) / rx, dy = (j - cy) / ry;
+      d[j * cw + i] += Math.exp(-(dx * dx + dy * dy) / 2);
+    }
+  });
+  let mx = 0; for (let i = 0; i < d.length; i++) if (d[i] > mx) mx = d[i];
+  const cvs = document.createElement("canvas");
+  cvs.width = cw; cvs.height = ch;
+  const g = cvs.getContext("2d"), im = g.createImageData(cw, ch);
+  for (let k = 0; k < d.length; k++){
+    const [r2, g2, b2, a] = heatRGBA(mx ? Math.min(1, d[k] / mx) : 0);
+    im.data[k*4] = r2; im.data[k*4+1] = g2; im.data[k*4+2] = b2; im.data[k*4+3] = a;
+  }
+  g.putImageData(im, 0, 0);
+  return cvs.toDataURL();
+}
 const heatColor = t => HEAT[Math.min(HEAT.length - 1, Math.max(0, Math.round(t * (HEAT.length - 1))))];
 
 function drawMap(){
@@ -1831,36 +1851,32 @@ function mapScene2D(ks, items){
   const [xk, yk] = ks;
   let plot = "";
 
-  // 密度
-  const cells = new Float64Array(HEAT_N * (one ? 1 : HEAT_N));
-  const bin = v => Math.max(0, Math.min(HEAT_N - 1, Math.round((v - 1) / 4 * (HEAT_N - 1))));
-  items.forEach(it => {
-    const i = bin(it.p[xk]), j = one ? 0 : bin(it.p[yk]);
-    cells[j * HEAT_N + i]++;
-  });
-  const mx = Math.max(1, ...cells);
-  const step = 4 / (HEAT_N - 1);
-  for (let j = 0; j < (one ? 1 : HEAT_N); j++) for (let i = 0; i < HEAT_N; i++){
-    const n = cells[j * HEAT_N + i];
-    if (!n) continue;
-    const cv = k => 1 + k * 4 / (HEAT_N - 1);
-    const cx0 = px(cv(i) - step / 2), cx1 = px(cv(i) + step / 2);
-    const cy0 = one ? cy - 150 : py(cv(j) + step / 2), cy1 = one ? cy + 150 : py(cv(j) - step / 2);
-    plot += `<rect x="${cx0.toFixed(1)}" y="${cy0.toFixed(1)}" width="${(cx1-cx0).toFixed(1)}" `
-      + `height="${(cy1-cy0).toFixed(1)}" fill="${heatColor(n / mx)}" fill-opacity="${one ? .32 : .55}"/>`;
+  // 密度（連続した場）
+  const HN = 12;
+  const cells = new Float64Array(HN * (one ? 1 : HN));
+  const bin = v => Math.max(0, Math.min(HN - 1, Math.round((v - 1) / 4 * (HN - 1))));
+  items.forEach(it => cells[(one ? 0 : bin(it.p[yk])) * HN + bin(it.p[xk])]++);
+  {
+    const pw = x1 - x0, ph = y1 - y0;
+    const perUnit0 = (x1 - x0 - 44) / 4 * V2.k;
+    const pts = items.map(it => ({ x: px(it.p[xk]) - x0, y: (one ? cy : py(it.p[yk])) - y0 }));
+    if (pts.length){
+      const url = heatURL(pts, pw, ph, Math.max(12, perUnit0 * .30));
+      plot += `<image href="${url}" x="${x0}" y="${y0}" width="${pw}" height="${ph}" preserveAspectRatio="none"/>`;
+    }
   }
   // 最も広い空白（占有セルから最も遠い空きセル）を1つだけ示す
   if (!one){
     let best = null, bd = -1;
-    for (let j = 0; j < HEAT_N; j++) for (let i = 0; i < HEAT_N; i++){
-      if (cells[j * HEAT_N + i]) continue;
+    for (let j = 0; j < HN; j++) for (let i = 0; i < HN; i++){
+      if (cells[j * HN + i]) continue;
       let d = 1e9;
-      for (let b = 0; b < HEAT_N; b++) for (let a = 0; a < HEAT_N; a++)
-        if (cells[b * HEAT_N + a]) d = Math.min(d, Math.hypot(a - i, b - j));
+      for (let b = 0; b < HN; b++) for (let a = 0; a < HN; a++)
+        if (cells[b * HN + a]) d = Math.min(d, Math.hypot(a - i, b - j));
       if (d > bd){ bd = d; best = [i, j]; }
     }
     if (best && bd >= 2){
-      const tx2 = px(1 + best[0] * 4 / (HEAT_N - 1)), ty2 = py(1 + best[1] * 4 / (HEAT_N - 1));
+      const tx2 = px(1 + best[0] * 4 / (HN - 1)), ty2 = py(1 + best[1] * 4 / (HN - 1));
       plot += `<text x="${tx2.toFixed(1)}" y="${ty2.toFixed(1)}" font-size="11" fill="${ink3}" `
         + `text-anchor="middle" font-family="sans-serif">空白</text>`;
     }
@@ -1882,7 +1898,7 @@ function mapScene2D(ks, items){
     dots.forEach(vy => {
       const Y = py(vy); if (Y < y0 - 2 || Y > y1 + 2) return;
       const maj = majX && Math.abs(vy - Math.round(vy)) < 1e-6;
-      plot += `<circle cx="${X.toFixed(1)}" cy="${Y.toFixed(1)}" r="${maj ? 1.7 : 1}" fill="${maj ? line : soft}"/>`;
+      plot += `<circle cx="${X.toFixed(1)}" cy="${Y.toFixed(1)}" r="${maj ? 1.8 : 1.1}" fill="${maj ? line : soft}" fill-opacity=".9"/>`;
     });
   });
   if (one) plot += `<line x1="${x0}" y1="${cy.toFixed(1)}" x2="${x1}" y2="${cy.toFixed(1)}" stroke="${soft}" stroke-width="1"/>`;
@@ -2224,6 +2240,14 @@ function drawConceptMap(){
   const mx = Math.max(1, ...cnt);
 
   let s = "";
+  // 密度（連続した場）
+  if (items.length){
+    const pw = x1 - x0, ph = y1 - y0;
+    const per = (x1 - x0 - IN * 2) / 4;
+    const pts = items.map(it => ({ x: px(it.p[xk]) - x0, y: py(it.p[yk]) - y0 }));
+    s += `<image href="${heatURL(pts, pw, ph, per * .30)}" x="${x0}" y="${y0}" `
+      + `width="${pw}" height="${ph}" preserveAspectRatio="none"/>`;
+  }
   // 方眼のドット
   for (let v = 1; v <= 5.001; v += .25){
     for (let u = 1; u <= 5.001; u += .25){
@@ -2239,7 +2263,7 @@ function drawConceptMap(){
     const on = sel && sel.i === i && sel.j === j;
     s += `<g data-cell="${i},${j}" style="cursor:pointer">`
       + `<rect x="${cx0.toFixed(1)}" y="${cy0.toFixed(1)}" width="${(cx1-cx0).toFixed(1)}" height="${(cy1-cy0).toFixed(1)}" `
-      + `fill="${n ? heatColor(n / mx) : "transparent"}" fill-opacity="${n ? .42 : 1}" `
+      + `fill="${on ? goal : "transparent"}" fill-opacity="${on ? .10 : 1}" `
       + `stroke="${on ? goal : line}" stroke-width="${on ? 2.5 : 1}"/>`
       + `<text x="${(cx0+6).toFixed(1)}" y="${(cy0+15).toFixed(1)}" font-size="10.5" font-family="monospace" `
       + `fill="${ink3}">${n}</text></g>`;
@@ -2595,7 +2619,7 @@ function render3D(){
   const modern = (P.image - 3) / 2, surp = (P.surp - 3) / 2;
 
   // 背景と床
-  const bgTop = atmos > 0 ? "#FAF6EF" : "#F4F5F6", bgBot = atmos > 0 ? "#DCD0BC" : "#C9CDD1";
+  const bgTop = atmos > 0 ? "#FDFBF7" : "#FBFBFC", bgBot = atmos > 0 ? "#E7DCC9" : "#D7DBDE";
   const bg = g.createLinearGradient(0, 0, 0, H);
   bg.addColorStop(0, bgTop); bg.addColorStop(1, bgBot);
   g.fillStyle = bg; g.fillRect(0, 0, W, H);
