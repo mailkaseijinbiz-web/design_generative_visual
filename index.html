@@ -1,0 +1,1109 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>感性モーフ ─ 感性デザイン9項目による画像改変プロトタイプ</title>
+<style>
+:root{
+  --paper:#EAEBE6; --surface:#F5F6F2; --sunk:#E1E3DC;
+  --line:#C6C9C0; --line-soft:#D8DAD2;
+  --ink:#191C1A; --ink-2:#4B514B; --ink-3:#7D847C;
+  --now:#1F4C5C; --goal:#9A6B24;
+  --pos:#2F6E4E; --neg:#A0442E;
+  --font-ui:"Hiragino Kaku Gothic ProN","Yu Gothic Medium","Yu Gothic","Noto Sans JP",system-ui,sans-serif;
+  --font-display:"Hiragino Mincho ProN","Yu Mincho","YuMincho","Noto Serif JP",serif;
+  --font-mono:ui-monospace,"SF Mono",Menlo,Consolas,monospace;
+}
+@media (prefers-color-scheme:dark){
+  :root{
+    --paper:#121412; --surface:#1A1D1A; --sunk:#0D0F0D;
+    --line:#343830; --line-soft:#262a24;
+    --ink:#E8EAE3; --ink-2:#A8AEA5; --ink-3:#767C74;
+    --now:#79B6C6; --goal:#D9A64E;
+    --pos:#6FB98C; --neg:#DE8869;
+  }
+}
+:root[data-theme="dark"]{
+  --paper:#121412; --surface:#1A1D1A; --sunk:#0D0F0D;
+  --line:#343830; --line-soft:#262a24;
+  --ink:#E8EAE3; --ink-2:#A8AEA5; --ink-3:#767C74;
+  --now:#79B6C6; --goal:#D9A64E;
+  --pos:#6FB98C; --neg:#DE8869;
+}
+:root[data-theme="light"]{
+  --paper:#EAEBE6; --surface:#F5F6F2; --sunk:#E1E3DC;
+  --line:#C6C9C0; --line-soft:#D8DAD2;
+  --ink:#191C1A; --ink-2:#4B514B; --ink-3:#7D847C;
+  --now:#1F4C5C; --goal:#9A6B24;
+  --pos:#2F6E4E; --neg:#A0442E;
+}
+*{box-sizing:border-box}
+html,body{height:100%}
+body{
+  margin:0; background:var(--paper); color:var(--ink);
+  font-family:var(--font-ui); font-size:13px; line-height:1.7;
+  -webkit-font-smoothing:antialiased;
+}
+button,input,select{font:inherit;color:inherit}
+button{cursor:pointer}
+:focus-visible{outline:2px solid var(--goal); outline-offset:2px}
+
+/* ── 見出し帯 ── */
+.masthead{
+  display:flex; align-items:baseline; gap:18px; flex-wrap:wrap;
+  padding:14px 20px 12px; border-bottom:1px solid var(--line);
+  background:var(--surface);
+}
+.masthead h1{
+  margin:0; font-family:var(--font-display); font-weight:600;
+  font-size:19px; letter-spacing:.06em;
+}
+.masthead .sub{color:var(--ink-3); font-size:11.5px; letter-spacing:.04em}
+.masthead .spacer{flex:1 1 auto}
+.tools{display:flex; gap:8px; align-items:center; flex-wrap:wrap}
+.btn{
+  border:1px solid var(--line); background:transparent; color:var(--ink);
+  padding:5px 12px; border-radius:2px; font-size:12px; letter-spacing:.03em;
+  transition:background .15s,border-color .15s;
+}
+.btn:hover{background:var(--sunk); border-color:var(--ink-3)}
+.btn.primary{background:var(--now); border-color:var(--now); color:var(--surface)}
+.btn.primary:hover{filter:brightness(1.12)}
+.btn.mini{padding:3px 8px; font-size:11px}
+
+/* ── 3面構成 ── */
+.deck{
+  display:grid; grid-template-columns:minmax(300px,340px) minmax(0,1fr) minmax(300px,360px);
+  align-items:stretch; min-height:calc(100vh - 52px);
+}
+.panel{display:flex; flex-direction:column; min-width:0}
+.panel + .panel{border-left:1px solid var(--line)}
+.panel-head{
+  display:flex; align-items:center; gap:10px; justify-content:space-between;
+  padding:11px 16px 9px; border-bottom:1px solid var(--line-soft);
+}
+.panel-head h2{
+  margin:0; font-family:var(--font-display); font-size:14px;
+  font-weight:600; letter-spacing:.09em;
+}
+.panel-head .cap{font-size:10.5px; color:var(--ink-3); letter-spacing:.06em}
+.panel-body{padding:12px 16px 20px; overflow:auto; flex:1 1 auto}
+
+/* ── 評価／目標の切替 ── */
+.modeswitch{display:flex; border:1px solid var(--line); border-radius:2px; overflow:hidden}
+.modeswitch button{
+  border:0; background:transparent; padding:4px 10px; font-size:11px;
+  letter-spacing:.04em; color:var(--ink-2);
+}
+.modeswitch button[aria-pressed="true"]{background:var(--ink); color:var(--paper)}
+.hint{
+  font-size:11px; color:var(--ink-3); margin:0 0 12px;
+  padding-left:9px; border-left:2px solid var(--line);
+}
+
+/* ── 台帳の行 ── */
+.axis{padding:9px 0 11px; border-bottom:1px dotted var(--line-soft)}
+.axis:last-child{border-bottom:0}
+.axis-top{display:flex; align-items:baseline; gap:8px}
+.axis-no{font-family:var(--font-mono); font-size:10.5px; color:var(--ink-3); width:16px}
+.axis-name{font-family:var(--font-display); font-size:14.5px; letter-spacing:.05em}
+.tag{
+  font-size:9.5px; letter-spacing:.08em; padding:1px 5px; border-radius:1px;
+  border:1px solid var(--line); color:var(--ink-3); white-space:nowrap;
+}
+.tag.pixel{border-color:var(--now); color:var(--now)}
+.axis-delta{
+  margin-left:auto; font-family:var(--font-mono); font-size:12px;
+  font-variant-numeric:tabular-nums; color:var(--ink-3);
+}
+.axis-delta.up{color:var(--pos)} .axis-delta.down{color:var(--neg)}
+.poles{display:flex; justify-content:space-between; font-size:10px; color:var(--ink-3); margin:2px 0 1px}
+.track{position:relative; height:22px}
+.track .rail{position:absolute; left:0; right:0; top:10px; height:1px; background:var(--line)}
+.track .ticks{position:absolute; left:0; right:0; top:7px; height:7px; display:flex; justify-content:space-between}
+.track .ticks i{width:1px; height:7px; background:var(--line)}
+.track .span{position:absolute; top:9px; height:3px; background:var(--goal); opacity:.55}
+.track .mark{
+  position:absolute; top:5px; width:9px; height:9px; margin-left:-4.5px;
+  border-radius:50%; border:1.5px solid var(--now); background:var(--paper);
+}
+.track input[type=range]{
+  position:absolute; inset:0; width:100%; margin:0; background:transparent;
+  -webkit-appearance:none; appearance:none;
+}
+.track input[type=range]::-webkit-slider-runnable-track{height:22px; background:transparent}
+.track input[type=range]::-moz-range-track{height:22px; background:transparent}
+.track input[type=range]::-webkit-slider-thumb{
+  -webkit-appearance:none; width:13px; height:13px; margin-top:4.5px; border-radius:2px;
+  background:var(--goal); border:1px solid var(--paper); cursor:ew-resize;
+}
+.track input[type=range]::-moz-range-thumb{
+  width:13px; height:13px; border-radius:2px; background:var(--goal);
+  border:1px solid var(--paper); cursor:ew-resize;
+}
+.axis[data-mode="now"] input[type=range]::-webkit-slider-thumb{background:var(--now); border-radius:50%}
+.axis[data-mode="now"] input[type=range]::-moz-range-thumb{background:var(--now); border-radius:50%}
+.axis-note{font-size:10.5px; color:var(--ink-3); margin-top:3px; min-height:1.4em}
+
+/* ── 観測窓 ── */
+.stage-body{
+  flex:1 1 auto; display:flex; flex-direction:column; gap:12px;
+  padding:14px 18px 18px; min-height:0;
+}
+.viewport{
+  position:relative; flex:1 1 auto; min-height:280px; display:grid; place-items:center;
+  background:var(--sunk); border:1px solid var(--line-soft); overflow:hidden;
+}
+.viewport canvas{max-width:100%; max-height:100%; display:block}
+.viewport .badge{
+  position:absolute; top:8px; font-family:var(--font-mono); font-size:10px;
+  letter-spacing:.1em; color:var(--ink-3); background:var(--surface);
+  border:1px solid var(--line-soft); padding:1px 6px;
+}
+.viewport .badge.l{left:8px} .viewport .badge.r{right:8px}
+.dropzone{position:absolute; inset:0; display:grid; place-items:center; pointer-events:none}
+.dropzone.on{background:color-mix(in srgb,var(--goal) 16%,transparent); border:2px dashed var(--goal)}
+.wipe{display:flex; align-items:center; gap:10px; font-size:11px; color:var(--ink-3)}
+.wipe input[type=range]{flex:1 1 auto; accent-color:var(--now)}
+.readout{
+  display:flex; gap:18px; flex-wrap:wrap; font-family:var(--font-mono);
+  font-size:11px; color:var(--ink-3); font-variant-numeric:tabular-nums;
+}
+
+/* ── 変異グリッド ── */
+.variants{display:grid; grid-template-columns:repeat(4,1fr); gap:6px}
+.variant{
+  border:1px solid var(--line-soft); background:var(--sunk); padding:0;
+  display:flex; flex-direction:column; overflow:hidden; text-align:left;
+}
+.variant:hover{border-color:var(--goal)}
+.variant canvas{width:100%; height:auto; display:block}
+.variant span{
+  font-size:9.5px; padding:2px 4px; color:var(--ink-3); letter-spacing:.02em;
+  white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+}
+
+/* ── 出力 ── */
+.radar{display:block; margin:0 auto 6px}
+.legend{display:flex; gap:14px; justify-content:center; font-size:10.5px; color:var(--ink-3); margin-bottom:14px}
+.legend i{display:inline-block; width:16px; height:0; border-top:2px solid; vertical-align:middle; margin-right:5px}
+.legend .n i{color:var(--now)} .legend .g i{color:var(--goal)}
+.block{margin-bottom:16px}
+.block h3{
+  margin:0 0 6px; font-size:11px; letter-spacing:.1em; color:var(--ink-3);
+  font-weight:500; display:flex; align-items:center; gap:8px;
+}
+.block h3::after{content:""; flex:1 1 auto; border-top:1px solid var(--line-soft)}
+.recipe{list-style:none; margin:0; padding:0; font-size:11.5px}
+.recipe li{display:flex; gap:8px; padding:3px 0; border-bottom:1px dotted var(--line-soft)}
+.recipe li:last-child{border-bottom:0}
+.recipe b{
+  font-family:var(--font-mono); font-size:10.5px; font-weight:400; color:var(--ink-3);
+  min-width:36px; font-variant-numeric:tabular-nums;
+}
+.brief{
+  width:100%; min-height:190px; resize:vertical; background:var(--sunk);
+  border:1px solid var(--line-soft); border-radius:2px; padding:10px;
+  font-family:var(--font-mono); font-size:11px; line-height:1.75; color:var(--ink);
+}
+.row{display:flex; gap:8px; flex-wrap:wrap}
+.empty{color:var(--ink-3); font-size:11.5px}
+
+@media (max-width:1180px){
+  .deck{grid-template-columns:minmax(0,1fr) minmax(0,1fr)}
+  .panel.out{grid-column:1 / -1; border-left:0; border-top:1px solid var(--line)}
+  .panel.stage{border-left:1px solid var(--line)}
+}
+@media (max-width:760px){
+  .deck{grid-template-columns:minmax(0,1fr)}
+  .panel + .panel{border-left:0; border-top:1px solid var(--line)}
+  .variants{grid-template-columns:repeat(3,1fr)}
+}
+@media (prefers-reduced-motion:reduce){*{transition:none !important}}
+</style>
+</head>
+<body>
+
+<header class="masthead">
+  <h1>感性モーフ</h1>
+  <span class="sub">感性デザイン9項目（山岡俊樹）による既存デザインの改変プロトタイプ</span>
+  <span class="spacer"></span>
+  <div class="tools">
+    <input type="file" id="file" accept="image/*" hidden>
+    <button class="btn" id="btn-open">画像を読み込む</button>
+    <button class="btn" id="btn-sample">見本に戻す</button>
+    <button class="btn" id="btn-reset">目標を現状に戻す</button>
+    <button class="btn primary" id="btn-save">改変案をPNG保存</button>
+  </div>
+</header>
+
+<main class="deck">
+
+  <!-- ① 評価台帳 -->
+  <section class="panel ledger">
+    <div class="panel-head">
+      <h2>評価台帳</h2>
+      <div class="modeswitch" role="group" aria-label="編集対象">
+        <button id="mode-now" aria-pressed="false">現状を評価</button>
+        <button id="mode-goal" aria-pressed="true">目標を決める</button>
+      </div>
+    </div>
+    <div class="panel-body">
+      <p class="hint" id="mode-hint"></p>
+      <div id="axes"></div>
+    </div>
+  </section>
+
+  <!-- ② 観測窓 -->
+  <section class="panel stage">
+    <div class="panel-head">
+      <h2>観測窓</h2>
+      <span class="cap" id="stage-cap">─</span>
+    </div>
+    <div class="stage-body">
+      <div class="viewport" id="viewport">
+        <canvas id="view"></canvas>
+        <span class="badge l">現状</span>
+        <span class="badge r">改変案</span>
+        <div class="dropzone" id="dropzone"></div>
+      </div>
+      <label class="wipe">
+        <span>比較</span>
+        <input type="range" id="wipe" min="0" max="100" value="42" aria-label="現状と改変案の比較位置">
+        <span id="wipe-val" class="cap">42%</span>
+      </label>
+      <div>
+        <div class="panel-head" style="padding:0 0 6px; border:0">
+          <h2 style="font-size:12px">派生案</h2>
+          <span class="cap">目標プロファイルを揺らした8案／選ぶと目標に採用</span>
+        </div>
+        <div class="variants" id="variants"></div>
+      </div>
+      <div class="readout" id="readout"></div>
+    </div>
+  </section>
+
+  <!-- ③ 出力 -->
+  <section class="panel out">
+    <div class="panel-head">
+      <h2>差分と指示</h2>
+      <span class="cap">現状 → 目標</span>
+    </div>
+    <div class="panel-body">
+      <svg class="radar" id="radar" width="300" height="244" viewBox="0 0 300 244" role="img" aria-label="9項目プロファイル図"></svg>
+      <div class="legend">
+        <span class="n"><i></i>現状</span>
+        <span class="g"><i></i>目標</span>
+      </div>
+
+      <div class="block">
+        <h3>画像処理レシピ</h3>
+        <ul class="recipe" id="recipe"></ul>
+      </div>
+
+      <div class="block">
+        <h3>設計指示書（構造項目を含む）</h3>
+        <textarea class="brief" id="brief" spellcheck="false" aria-label="設計指示書"></textarea>
+        <div class="row" style="margin-top:8px">
+          <button class="btn mini" id="btn-copy">指示書をコピー</button>
+          <button class="btn mini" id="btn-json">レシピをJSONで保存</button>
+        </div>
+      </div>
+    </div>
+  </section>
+
+</main>
+
+<script>
+"use strict";
+
+/* ============================================================
+   感性デザイン9項目（山岡俊樹編『デザイン人間工学の基礎』pp.238-240）
+   engine:"pixel" … 画素操作で表現できる項目（即時レンダリング）
+   engine:"brief" … 構造・行為に属する項目（指示文として出力）
+   ============================================================ */
+const AXES = [
+  { key:"atmos", no:1, name:"雰囲気", engine:"pixel",
+    low:"落ちついた", high:"活気のある",
+    up:"光量と暖色を上げ、ハイライトを滲ませて活気を出す",
+    down:"陰を沈めて周辺光量を落とし、静穏な佇まいにする",
+    bUp:"照度・音・人の密度を上げ、賑わいの感じられる場にする",
+    bDown:"照度を落とし余白を増やし、静けさの感じられる場にする" },
+
+  { key:"image", no:2, name:"デザインイメージ", engine:"pixel",
+    low:"クラシック", high:"モダン",
+    up:"コントラストを立て、色味を冷やし、輪郭を締めてモダンに寄せる",
+    down:"暖色に転ばせ調子を柔らげ、時間の乗ったクラシックに寄せる",
+    bUp:"直線・面構成・無装飾の語彙に置き換える",
+    bDown:"装飾・曲線・伝統素材の語彙を戻す" },
+
+  { key:"color", no:3, name:"色彩", engine:"pixel",
+    low:"淡い色・中間色", high:"原色・鮮烈",
+    up:"彩度と色の隔たりを上げ、原色に近い配色にする",
+    down:"彩度を落とし白を混ぜ、淡い中間色の配色にする",
+    bUp:"主役色を一色決め、面積比を絞って強く使う",
+    bDown:"色数を減らし、明度差で構成する" },
+
+  { key:"fit", no:4, name:"フィット性", engine:"brief",
+    low:"分離している", high:"一体感がある",
+    bUp:"接触部を身体の曲率に沿わせ、把持面・背面の連続性を高める（例：包み込むイス）",
+    bDown:"接触部を単純化し、機器と身体の境界を明快に分ける" },
+
+  { key:"form", no:5, name:"形態", engine:"pixel",
+    low:"複雑・装飾的", high:"単純・純化",
+    up:"面を統合し階調を丸めて、要素の少ない形態に見せる",
+    down:"細部を起こし、情報量の多い形態に見せる",
+    bUp:"部品点数と分割線を減らし、ひとつながりの形状にする",
+    bDown:"分節・稜線・凹凸を与え、形態に表情をつける" },
+
+  { key:"func", no:6, name:"機能性・利便性", engine:"brief",
+    low:"", high:"",
+    bUp:"操作数を減らし、手順の見える化と誤操作の防止を図る（例：OXOの太柄）",
+    bDown:"機能を絞り、単一目的の道具として割り切る" },
+
+  { key:"matter", no:7, name:"質感", engine:"pixel",
+    low:"均質・無機的", high:"素材感がある",
+    up:"微細な粒状感と局所コントラストを与え、素材の肌を出す",
+    down:"表面を均し、粒状感を消して無機質にする",
+    bUp:"木・和紙・革など、手触りの残る素材に置換する",
+    bDown:"樹脂・ガラスなど均質な素材に置換する" },
+
+  { key:"combi", no:8, name:"新しい組み合わせ", engine:"brief",
+    low:"", high:"",
+    bUp:"従来ここでは使われない素材・技術を一箇所だけ持ち込む（例：背もたれにエラストマー樹脂）",
+    bDown:"素材と技術を定石の組み合わせに戻し、破綻を減らす" },
+
+  { key:"surp", no:9, name:"意外性", engine:"pixel",
+    low:"予定調和", high:"意外性がある",
+    up:"影と光に別々の色を差し、色ずれを起こして予定を裏切る",
+    down:"色相を一つの方向へ束ね、調和した見えにする",
+    bUp:"素材・配色・形状のいずれか一つを常識の外に出す（例：透明樹脂のピアノ）",
+    bDown:"逸脱を戻し、用途から素直に導かれる見えにする" }
+];
+const AX = Object.fromEntries(AXES.map(a => [a.key, a]));
+const PIXEL_KEYS = AXES.filter(a => a.engine === "pixel").map(a => a.key);
+
+/* ── 状態 ── */
+const state = {
+  now:  Object.fromEntries(AXES.map(a => [a.key, 3])),
+  goal: Object.fromEntries(AXES.map(a => [a.key, 3])),
+  mode: "goal",
+  wipe: 42,
+  src: null,        // {w,h,data:Uint8ClampedArray} 原画（表示解像度）
+  full: null,       // 原寸 ImageBitmap/HTMLImageElement（保存用）
+  label: "見本：椅子（手続き生成）"
+};
+
+/* ============================================================
+   画素演算
+   ============================================================ */
+const clamp255 = v => v < 0 ? 0 : v > 255 ? 255 : v;
+
+function boxBlur(src, w, h, r){
+  const out = new Uint8ClampedArray(src);
+  r = Math.round(r);
+  if (r < 1) return out;
+  const tmp = new Float32Array(w * h * 3), win = r * 2 + 1;
+  for (let y = 0; y < h; y++){
+    let s0 = 0, s1 = 0, s2 = 0;
+    for (let i = -r; i <= r; i++){
+      const x = Math.min(w - 1, Math.max(0, i)), p = (y * w + x) * 4;
+      s0 += src[p]; s1 += src[p+1]; s2 += src[p+2];
+    }
+    for (let x = 0; x < w; x++){
+      const q = (y * w + x) * 3;
+      tmp[q] = s0 / win; tmp[q+1] = s1 / win; tmp[q+2] = s2 / win;
+      const xa = Math.min(w - 1, Math.max(0, x - r)), xb = Math.min(w - 1, Math.max(0, x + r + 1));
+      const pa = (y * w + xa) * 4, pb = (y * w + xb) * 4;
+      s0 += src[pb] - src[pa]; s1 += src[pb+1] - src[pa+1]; s2 += src[pb+2] - src[pa+2];
+    }
+  }
+  for (let x = 0; x < w; x++){
+    let s0 = 0, s1 = 0, s2 = 0;
+    for (let i = -r; i <= r; i++){
+      const y = Math.min(h - 1, Math.max(0, i)), q = (y * w + x) * 3;
+      s0 += tmp[q]; s1 += tmp[q+1]; s2 += tmp[q+2];
+    }
+    for (let y = 0; y < h; y++){
+      const p = (y * w + x) * 4;
+      out[p] = s0 / win; out[p+1] = s1 / win; out[p+2] = s2 / win;
+      const ya = Math.min(h - 1, Math.max(0, y - r)), yb = Math.min(h - 1, Math.max(0, y + r + 1));
+      const qa = (ya * w + x) * 3, qb = (yb * w + x) * 3;
+      s0 += tmp[qb] - tmp[qa]; s1 += tmp[qb+1] - tmp[qa+1]; s2 += tmp[qb+2] - tmp[qa+2];
+    }
+  }
+  return out;
+}
+
+function unsharp(px, w, h, r, amt){
+  const b = boxBlur(px, w, h, r);
+  for (let i = 0; i < px.length; i += 4)
+    for (let c = 0; c < 3; c++) px[i+c] = clamp255(px[i+c] + (px[i+c] - b[i+c]) * amt);
+  return px;
+}
+
+/* 露出・コントラスト・彩度・色温度・淡色化をまとめた一巡 */
+function tone(px, o){
+  const exposure = o.exposure || 0, contrast = o.contrast || 0,
+        sat = o.sat == null ? 1 : o.sat, vib = o.vib || 0,
+        temp = o.temp || 0, pastel = o.pastel || 0;
+  for (let i = 0; i < px.length; i += 4){
+    let r = px[i], g = px[i+1], b = px[i+2];
+    if (exposure) { r += exposure * 255; g += exposure * 255; b += exposure * 255; }
+    if (temp) { r += temp; b -= temp; g += temp * .25; }
+    if (contrast){
+      const k = 1 + contrast;
+      r = (r - 128) * k + 128; g = (g - 128) * k + 128; b = (b - 128) * k + 128;
+    }
+    const lum = .2126 * r + .7152 * g + .0722 * b;
+    if (sat !== 1 || vib){
+      const mx = Math.max(r, g, b), mn = Math.min(r, g, b);
+      const cur = mx <= 0 ? 0 : (mx - mn) / mx;             // 現在の鮮やかさ
+      const k = sat + vib * (1 - cur);                       // 淡い部分ほど強く効かせる
+      r = lum + (r - lum) * k; g = lum + (g - lum) * k; b = lum + (b - lum) * k;
+    }
+    if (pastel){
+      r += (255 - r) * pastel; g += (255 - g) * pastel; b += (255 - b) * pastel;
+    }
+    px[i] = clamp255(r); px[i+1] = clamp255(g); px[i+2] = clamp255(b);
+  }
+  return px;
+}
+
+function vignette(px, w, h, amount){
+  if (amount <= 0) return px;
+  const cx = w / 2, cy = h / 2, max = Math.hypot(cx, cy);
+  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++){
+    const d = Math.hypot(x - cx, y - cy) / max;
+    const k = 1 - amount * Math.pow(Math.max(0, d - .35) / .65, 1.7);
+    const p = (y * w + x) * 4;
+    px[p] *= k; px[p+1] *= k; px[p+2] *= k;
+  }
+  return px;
+}
+
+function bloom(px, w, h, amount){
+  if (amount <= 0) return px;
+  const hi = new Uint8ClampedArray(px.length);
+  for (let i = 0; i < px.length; i += 4){
+    const lum = .2126 * px[i] + .7152 * px[i+1] + .0722 * px[i+2];
+    const k = Math.max(0, (lum - 170) / 85);
+    hi[i] = px[i] * k; hi[i+1] = px[i+1] * k; hi[i+2] = px[i+2] * k; hi[i+3] = 255;
+  }
+  const b = boxBlur(hi, w, h, Math.max(2, Math.round(Math.min(w, h) / 60)));
+  for (let i = 0; i < px.length; i += 4)
+    for (let c = 0; c < 3; c++)
+      px[i+c] = clamp255(255 - (255 - px[i+c]) * (1 - (b[i+c] / 255) * amount));
+  return px;
+}
+
+const rand = seed => () => (seed = (seed * 1664525 + 1013904223) >>> 0) / 4294967296;
+
+function grain(px, amount, seed){
+  if (amount <= 0) return px;
+  const rnd = rand(seed >>> 0 || 1);
+  for (let i = 0; i < px.length; i += 4){
+    const n = (rnd() - .5) * amount * 255;
+    px[i] = clamp255(px[i] + n); px[i+1] = clamp255(px[i+1] + n * .9); px[i+2] = clamp255(px[i+2] + n * .8);
+  }
+  return px;
+}
+
+function splitTone(px, k){
+  // 影に青緑、光に赤紫を差す
+  for (let i = 0; i < px.length; i += 4){
+    const lum = (.2126 * px[i] + .7152 * px[i+1] + .0722 * px[i+2]) / 255;
+    const s = (1 - lum) * k, hgl = lum * k;
+    px[i]   = clamp255(px[i]   - 28 * s + 30 * hgl);
+    px[i+1] = clamp255(px[i+1] + 10 * s - 14 * hgl);
+    px[i+2] = clamp255(px[i+2] + 34 * s + 22 * hgl);
+  }
+  return px;
+}
+
+function channelOffset(px, w, h, dx){
+  dx = Math.round(dx);
+  if (!dx) return px;
+  const src = new Uint8ClampedArray(px);
+  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++){
+    const p = (y * w + x) * 4;
+    const xr = Math.min(w - 1, Math.max(0, x - dx)), xb = Math.min(w - 1, Math.max(0, x + dx));
+    px[p]   = src[(y * w + xr) * 4];
+    px[p+2] = src[(y * w + xb) * 4 + 2];
+  }
+  return px;
+}
+
+/* 色相を支配色へ束ねる（＝予定調和側） */
+function harmonize(px, k){
+  let sx = 0, sy = 0;
+  for (let i = 0; i < px.length; i += 4){
+    const r = px[i]/255, g = px[i+1]/255, b = px[i+2]/255;
+    const mx = Math.max(r,g,b), mn = Math.min(r,g,b), c = mx - mn;
+    if (c < .04) continue;
+    let hDeg;
+    if (mx === r) hDeg = ((g - b) / c) % 6;
+    else if (mx === g) hDeg = (b - r) / c + 2;
+    else hDeg = (r - g) / c + 4;
+    hDeg *= Math.PI / 3;
+    sx += Math.cos(hDeg) * c; sy += Math.sin(hDeg) * c;
+  }
+  const target = Math.atan2(sy, sx);
+  const tr = Math.cos(target), tg = Math.cos(target - 2.094), tb = Math.cos(target - 4.189);
+  for (let i = 0; i < px.length; i += 4){
+    const lum = .2126 * px[i] + .7152 * px[i+1] + .0722 * px[i+2];
+    const c = (Math.max(px[i], px[i+1], px[i+2]) - Math.min(px[i], px[i+1], px[i+2])) / 2;
+    px[i]   = clamp255(px[i]   + ((lum + tr * c) - px[i])   * k);
+    px[i+1] = clamp255(px[i+1] + ((lum + tg * c) - px[i+1]) * k);
+    px[i+2] = clamp255(px[i+2] + ((lum + tb * c) - px[i+2]) * k);
+  }
+  return px;
+}
+
+/* ── 差分（-4..+4）を画素演算へ ── */
+function renderPixels(src, w, h, delta){
+  let px = new Uint8ClampedArray(src);
+  const t = k => (delta[k] || 0) / 4;   // -1..1
+
+  // 5. 形態：面の統合／細部の起こし
+  const tf = t("form");
+  if (Math.abs(tf) > .02){
+    if (tf > 0){
+      const b = boxBlur(px, w, h, 1 + 3 * tf);
+      const levels = Math.max(4, Math.round(26 - 20 * tf)), step = 255 / (levels - 1);
+      const mix = Math.min(1, tf * 1.15);
+      for (let i = 0; i < px.length; i += 4)
+        for (let c = 0; c < 3; c++){
+          const q = Math.round(b[i+c] / step) * step;
+          px[i+c] = clamp255(px[i+c] + (q - px[i+c]) * mix);
+        }
+    } else {
+      px = unsharp(px, w, h, 2, Math.abs(tf) * 1.2);
+    }
+  }
+
+  // 2. デザインイメージ：クラシック↔モダン
+  const ti = t("image");
+  if (Math.abs(ti) > .02){
+    if (ti > 0){
+      tone(px, { contrast:.34 * ti, sat:1 - .12 * ti, temp:-14 * ti });
+      px = unsharp(px, w, h, 2, .55 * ti);
+    } else {
+      const a = Math.abs(ti);
+      tone(px, { contrast:-.18 * a, sat:1 - .3 * a, temp:16 * a, exposure:.03 * a });
+      px = boxBlur(px, w, h, a > .6 ? 1 : 0);
+      vignette(px, w, h, .22 * a);
+    }
+  }
+
+  // 3. 色彩
+  const tc = t("color");
+  if (Math.abs(tc) > .02){
+    if (tc > 0) tone(px, { sat:1 + .55 * tc, vib:.5 * tc, contrast:.06 * tc });
+    else { const a = Math.abs(tc); tone(px, { sat:1 - .6 * a, pastel:.16 * a }); }
+  }
+
+  // 1. 雰囲気
+  const ta = t("atmos");
+  if (Math.abs(ta) > .02){
+    if (ta > 0){
+      tone(px, { exposure:.10 * ta, temp:8 * ta, contrast:.06 * ta });
+      bloom(px, w, h, .55 * ta);
+    } else {
+      const a = Math.abs(ta);
+      tone(px, { exposure:-.07 * a, contrast:.10 * a, sat:1 - .22 * a, temp:-5 * a });
+      vignette(px, w, h, .5 * a);
+    }
+  }
+
+  // 7. 質感
+  const tm = t("matter");
+  if (Math.abs(tm) > .02){
+    if (tm > 0){
+      px = unsharp(px, w, h, Math.max(3, Math.round(Math.min(w, h) / 90)), .7 * tm);
+      grain(px, .10 * tm, 20250405);
+    } else {
+      const a = Math.abs(tm);
+      const b = boxBlur(px, w, h, 1 + Math.round(a * 2));
+      for (let i = 0; i < px.length; i += 4)
+        for (let c = 0; c < 3; c++) px[i+c] = px[i+c] + (b[i+c] - px[i+c]) * a * .85;
+    }
+  }
+
+  // 9. 意外性
+  const ts = t("surp");
+  if (Math.abs(ts) > .02){
+    if (ts > 0){
+      splitTone(px, .55 * ts);
+      if (ts > .5) channelOffset(px, w, h, Math.max(1, Math.min(w, h) / 520 * ts * 2));
+    } else {
+      harmonize(px, Math.abs(ts) * .6);
+    }
+  }
+  return px;
+}
+
+/* ============================================================
+   現状プロファイルの自動推定
+   ============================================================ */
+function estimate(src, w, h){
+  let n = 0, sumL = 0, sumL2 = 0, sumS = 0, sumRG = 0, sumRG2 = 0, sumYB = 0, sumYB2 = 0, warm = 0;
+  const step = 4 * Math.max(1, Math.round(Math.sqrt(w * h / 60000)));
+  for (let i = 0; i < src.length; i += step){
+    const r = src[i], g = src[i+1], b = src[i+2];
+    const l = (.2126 * r + .7152 * g + .0722 * b) / 255;
+    const mx = Math.max(r,g,b), mn = Math.min(r,g,b);
+    sumL += l; sumL2 += l * l; sumS += mx <= 0 ? 0 : (mx - mn) / mx;
+    const rg = r - g, yb = (r + g) / 2 - b;
+    sumRG += rg; sumRG2 += rg * rg; sumYB += yb; sumYB2 += yb * yb;
+    warm += (r - b) / 255; n++;
+  }
+  const meanL = sumL / n, sdL = Math.sqrt(Math.max(0, sumL2 / n - meanL * meanL));
+  const meanS = sumS / n;
+  const sdRG = Math.sqrt(Math.max(0, sumRG2 / n - (sumRG / n) ** 2));
+  const sdYB = Math.sqrt(Math.max(0, sumYB2 / n - (sumYB / n) ** 2));
+  const colorfulness = Math.sqrt(sdRG * sdRG + sdYB * sdYB) + .3 * Math.hypot(sumRG / n, sumYB / n);
+  const meanWarm = warm / n;
+
+  // 高周波成分＝細部の量
+  let edge = 0, en = 0;
+  for (let y = 1; y < h - 1; y += 2) for (let x = 1; x < w - 1; x += 2){
+    const p = (y * w + x) * 4;
+    const l  = .2126 * src[p] + .7152 * src[p+1] + .0722 * src[p+2];
+    const lx = .2126 * src[p+4] + .7152 * src[p+5] + .0722 * src[p+6];
+    const ly = .2126 * src[p + w*4] + .7152 * src[p + w*4 + 1] + .0722 * src[p + w*4 + 2];
+    edge += (Math.abs(l - lx) + Math.abs(l - ly)) / 2; en++;
+  }
+  edge = edge / Math.max(1, en);
+
+  const sc = (v, lo, hi) => Math.max(1, Math.min(5, Math.round(1 + 4 * (v - lo) / (hi - lo))));
+  return {
+    atmos:  sc(meanL * .6 + Math.max(0, meanWarm) * .8 + meanS * .3, .18, .78),
+    image:  sc(sdL * 1.1 - meanWarm * .5 + (1 - meanS) * .25, .04, .55),
+    color:  sc(colorfulness, 8, 68),
+    form:   sc(1 - Math.min(1, edge / 26), .25, .95),
+    matter: sc(edge, 2, 24),
+    surp:   sc(colorfulness / 60 + edge / 60, .12, .85),
+    fit:3, func:3, combi:3
+  };
+}
+
+/* ============================================================
+   画面
+   ============================================================ */
+const $ = id => document.getElementById(id);
+const view = $("view"), vctx = view.getContext("2d", { willReadFrequently:true });
+let processed = null, renderTimer = 0;
+
+/* ── 見本画像（手続き生成：椅子と壁） ── */
+function makeSample(){
+  const w = 880, h = 620, c = document.createElement("canvas");
+  c.width = w; c.height = h;
+  const g = c.getContext("2d");
+
+  const wall = g.createLinearGradient(0, 0, w * .3, h);
+  wall.addColorStop(0, "#DCD3C4"); wall.addColorStop(1, "#B9AE9C");
+  g.fillStyle = wall; g.fillRect(0, 0, w, h);
+
+  g.fillStyle = "#8F8271"; g.fillRect(0, h * .68, w, h * .32);
+  const floor = g.createLinearGradient(0, h * .68, 0, h);
+  floor.addColorStop(0, "rgba(255,255,255,.18)"); floor.addColorStop(1, "rgba(0,0,0,.22)");
+  g.fillStyle = floor; g.fillRect(0, h * .68, w, h * .32);
+
+  // 窓明かり
+  const light = g.createLinearGradient(w * .05, 0, w * .62, h * .9);
+  light.addColorStop(0, "rgba(255,246,224,.55)"); light.addColorStop(1, "rgba(255,246,224,0)");
+  g.fillStyle = light; g.beginPath();
+  g.moveTo(w * .04, 0); g.lineTo(w * .46, 0); g.lineTo(w * .70, h * .78); g.lineTo(w * .16, h * .78);
+  g.closePath(); g.fill();
+
+  // 影
+  g.fillStyle = "rgba(40,30,20,.28)";
+  g.beginPath(); g.ellipse(w * .54, h * .855, w * .21, h * .045, 0, 0, Math.PI * 2); g.fill();
+
+  const seat = "#2F4A52", seatHi = "#4B6E76", wood = "#8A5A32", woodHi = "#A9764A";
+  const round = (x, y, ww, hh, r, fill) => {
+    g.beginPath();
+    if (g.roundRect) g.roundRect(x, y, ww, hh, r);
+    else { g.moveTo(x+r,y); g.arcTo(x+ww,y,x+ww,y+hh,r); g.arcTo(x+ww,y+hh,x,y+hh,r); g.arcTo(x,y+hh,x,y,r); g.arcTo(x,y,x+ww,y,r); }
+    g.fillStyle = fill; g.fill();
+  };
+  // 脚
+  g.strokeStyle = wood; g.lineWidth = 11; g.lineCap = "round";
+  [[-.13, .10], [.13, .10], [-.10, -.02], [.10, -.02]].forEach(([dx, dy]) => {
+    g.beginPath();
+    g.moveTo(w * (.54 + dx * .8), h * (.60 + dy));
+    g.lineTo(w * (.54 + dx * 1.25), h * .855);
+    g.stroke();
+  });
+  // 座面
+  round(w * .40, h * .555, w * .28, h * .06, 14, seat);
+  round(w * .40, h * .555, w * .28, h * .02, 10, seatHi);
+  // 背もたれ
+  g.save();
+  g.translate(w * .555, h * .40); g.rotate(-.07);
+  round(-w * .125, -h * .18, w * .25, h * .21, 60, seat);
+  round(-w * .105, -h * .165, w * .21, h * .05, 30, seatHi);
+  g.restore();
+  // 背もたれの支柱
+  g.strokeStyle = woodHi; g.lineWidth = 9;
+  g.beginPath(); g.moveTo(w * .445, h * .555); g.lineTo(w * .455, h * .40); g.stroke();
+  g.beginPath(); g.moveTo(w * .665, h * .555); g.lineTo(w * .655, h * .40); g.stroke();
+
+  // 小卓と器
+  round(w * .175, h * .615, w * .155, h * .022, 6, "#6E4B2C");
+  g.strokeStyle = "#6E4B2C"; g.lineWidth = 7;
+  g.beginPath(); g.moveTo(w * .195, h * .637); g.lineTo(w * .188, h * .80); g.stroke();
+  g.beginPath(); g.moveTo(w * .310, h * .637); g.lineTo(w * .317, h * .80); g.stroke();
+  g.fillStyle = "#C9552F";
+  g.beginPath(); g.ellipse(w * .252, h * .60, w * .028, h * .022, 0, 0, Math.PI * 2); g.fill();
+  g.fillStyle = "rgba(255,255,255,.35)";
+  g.beginPath(); g.ellipse(w * .245, h * .594, w * .012, h * .008, 0, 0, Math.PI * 2); g.fill();
+
+  // わずかな粒状感
+  const im = g.getImageData(0, 0, w, h);
+  grain(im.data, .022, 7);
+  g.putImageData(im, 0, 0);
+  return c;
+}
+
+function loadCanvas(canvas, label){
+  const max = 900;
+  const k = Math.min(1, max / Math.max(canvas.width, canvas.height));
+  const w = Math.max(1, Math.round(canvas.width * k)), h = Math.max(1, Math.round(canvas.height * k));
+  const tmp = document.createElement("canvas");
+  tmp.width = w; tmp.height = h;
+  tmp.getContext("2d").drawImage(canvas, 0, 0, w, h);
+  const data = tmp.getContext("2d").getImageData(0, 0, w, h).data;
+  state.src = { w, h, data };
+  state.label = label;
+  const est = estimate(data, w, h);
+  AXES.forEach(a => { state.now[a.key] = est[a.key]; state.goal[a.key] = est[a.key]; });
+  view.width = w; view.height = h;
+  drawAll();
+}
+
+function loadFile(file){
+  if (!file || !file.type.startsWith("image/")) return;
+  const img = new Image();
+  img.onload = () => {
+    const c = document.createElement("canvas");
+    c.width = img.naturalWidth; c.height = img.naturalHeight;
+    c.getContext("2d").drawImage(img, 0, 0);
+    loadCanvas(c, file.name || "読み込み画像");
+    URL.revokeObjectURL(img.src);
+  };
+  img.src = URL.createObjectURL(file);
+}
+
+const deltas = () => Object.fromEntries(AXES.map(a => [a.key, state.goal[a.key] - state.now[a.key]]));
+
+function drawViewport(){
+  const { w, h, data } = state.src;
+  const d = deltas();
+  const t0 = performance.now();
+  processed = renderPixels(data, w, h, d);
+  const ms = performance.now() - t0;
+
+  const out = new ImageData(new Uint8ClampedArray(processed), w, h);
+  vctx.putImageData(out, 0, 0);
+  const cut = Math.round(w * state.wipe / 100);
+  if (cut > 0){
+    vctx.putImageData(new ImageData(new Uint8ClampedArray(data), w, h), 0, 0, 0, 0, cut, h);
+    vctx.save();
+    vctx.strokeStyle = "rgba(255,255,255,.85)"; vctx.lineWidth = 1;
+    vctx.beginPath(); vctx.moveTo(cut + .5, 0); vctx.lineTo(cut + .5, h); vctx.stroke();
+    vctx.restore();
+  }
+  const moved = PIXEL_KEYS.filter(k => d[k] !== 0).length;
+  $("readout").innerHTML =
+    `<span>${w}×${h} px</span><span>描画 ${ms.toFixed(0)} ms</span>` +
+    `<span>可動 ${moved}/${PIXEL_KEYS.length} 項目</span><span>Σ|Δ| ${AXES.reduce((s,a)=>s+Math.abs(d[a.key]),0)}</span>`;
+  $("stage-cap").textContent = state.label;
+}
+
+/* ── 台帳 ── */
+function buildAxes(){
+  const wrap = $("axes");
+  wrap.innerHTML = "";
+  AXES.forEach(a => {
+    const row = document.createElement("div");
+    row.className = "axis"; row.dataset.key = a.key;
+    row.innerHTML = `
+      <div class="axis-top">
+        <span class="axis-no">${a.no}</span>
+        <span class="axis-name">${a.name}</span>
+        <span class="tag ${a.engine === "pixel" ? "pixel" : ""}">${a.engine === "pixel" ? "画像で改変" : "指示で改変"}</span>
+        <span class="axis-delta" data-d>±0</span>
+      </div>
+      <div class="poles"><span>${a.low || "低"}</span><span>${a.high || "高"}</span></div>
+      <div class="track">
+        <span class="rail"></span>
+        <span class="ticks"><i></i><i></i><i></i><i></i><i></i></span>
+        <span class="span" data-span></span>
+        <span class="mark" data-mark></span>
+        <input type="range" min="1" max="5" step="1" aria-label="${a.name}">
+      </div>
+      <div class="axis-note" data-note></div>`;
+    const input = row.querySelector("input");
+    input.addEventListener("input", () => {
+      const v = +input.value;
+      if (state.mode === "now") state.now[a.key] = v; else state.goal[a.key] = v;
+      drawAll();
+    });
+    wrap.appendChild(row);
+  });
+}
+
+function syncAxes(){
+  const d = deltas();
+  document.querySelectorAll(".axis").forEach(row => {
+    const a = AX[row.dataset.key], now = state.now[a.key], goal = state.goal[a.key], dv = d[a.key];
+    row.dataset.mode = state.mode;
+    const input = row.querySelector("input");
+    input.value = state.mode === "now" ? now : goal;
+    const pos = v => `calc(${(v - 1) / 4 * 100}% + ${(2 - (v - 1) / 4 * 4) * 3}px)`;
+    row.querySelector("[data-mark]").style.left = pos(now);
+    const span = row.querySelector("[data-span]");
+    const lo = Math.min(now, goal), hi = Math.max(now, goal);
+    span.style.left = pos(lo);
+    span.style.width = `calc(${(hi - lo) / 4 * 100}%)`;
+    span.style.display = dv === 0 ? "none" : "block";
+    const chip = row.querySelector("[data-d]");
+    chip.textContent = dv === 0 ? "±0" : (dv > 0 ? "+" : "−") + Math.abs(dv);
+    chip.className = "axis-delta" + (dv > 0 ? " up" : dv < 0 ? " down" : "");
+    const note = row.querySelector("[data-note]");
+    if (dv === 0) note.textContent = "";
+    else if (a.engine === "pixel") note.textContent = dv > 0 ? a.up : a.down;
+    else note.textContent = dv > 0 ? a.bUp : a.bDown;
+  });
+}
+
+/* ── プロファイル図 ── */
+const SHORT = { atmos:"雰囲気", image:"イメージ", color:"色彩", fit:"フィット",
+                form:"形態", func:"機能性", matter:"質感", combi:"組合せ", surp:"意外性" };
+function drawRadar(){
+  const svg = $("radar"), W = 300, H = 244, cx = W / 2, cy = H / 2 + 2, R = 80;
+  const ink = getComputedStyle(document.body).getPropertyValue("--line").trim();
+  const ink3 = getComputedStyle(document.body).getPropertyValue("--ink-3").trim();
+  const cNow = getComputedStyle(document.body).getPropertyValue("--now").trim();
+  const cGoal = getComputedStyle(document.body).getPropertyValue("--goal").trim();
+  const pt = (i, v) => {
+    const ang = -Math.PI / 2 + i * 2 * Math.PI / AXES.length, r = R * (v - 1) / 4 * .9 + R * .1;
+    return [cx + Math.cos(ang) * r, cy + Math.sin(ang) * r];
+  };
+  let s = "";
+  for (let ring = 1; ring <= 4; ring++){
+    const p = AXES.map((_, i) => pt(i, 1 + ring).map(n => n.toFixed(1)).join(",")).join(" ");
+    s += `<polygon points="${p}" fill="none" stroke="${ink}" stroke-width="${ring === 4 ? 1 : .5}"/>`;
+  }
+  AXES.forEach((a, i) => {
+    const [x, y] = pt(i, 5);
+    s += `<line x1="${cx}" y1="${cy}" x2="${x.toFixed(1)}" y2="${y.toFixed(1)}" stroke="${ink}" stroke-width=".5"/>`;
+    const lx = cx + (x - cx) * 1.16, ly = cy + (y - cy) * 1.16;
+    const anchor = Math.abs(lx - cx) < 8 ? "middle" : lx > cx ? "start" : "end";
+    s += `<text x="${lx.toFixed(1)}" y="${(ly + 3.5).toFixed(1)}" font-size="10" fill="${ink3}" text-anchor="${anchor}" font-family="var(--font-ui)" letter-spacing=".02em">${SHORT[a.key]}</text>`;
+  });
+  const poly = (get, color, dash) => {
+    const p = AXES.map((a, i) => pt(i, get(a.key)).map(n => n.toFixed(1)).join(",")).join(" ");
+    return `<polygon points="${p}" fill="${color}" fill-opacity=".10" stroke="${color}" stroke-width="1.6" ${dash ? `stroke-dasharray="${dash}"` : ""}/>`;
+  };
+  s += poly(k => state.now[k], cNow, "3 3");
+  s += poly(k => state.goal[k], cGoal, "");
+  svg.innerHTML = s;
+}
+
+/* ── レシピと指示書 ── */
+const OPS = {
+  atmos:  d => d > 0 ? `露出 +${(.10*d/4*100).toFixed(0)}% ／ 暖色 +${(8*d/4).toFixed(1)} ／ ブルーム ${(.55*d/4).toFixed(2)}`
+                     : `露出 ${(.07*d/4*100).toFixed(0)}% ／ 周辺減光 ${(.5*Math.abs(d)/4).toFixed(2)} ／ 彩度 −${(22*Math.abs(d)/4).toFixed(0)}%`,
+  image:  d => d > 0 ? `コントラスト +${(34*d/4).toFixed(0)}% ／ 色温度 −${(14*d/4).toFixed(0)} ／ 輪郭強調 ${(.55*d/4).toFixed(2)}`
+                     : `色温度 +${(16*Math.abs(d)/4).toFixed(0)} ／ コントラスト −${(18*Math.abs(d)/4).toFixed(0)}% ／ 軟調化`,
+  color:  d => d > 0 ? `彩度 +${(55*d/4).toFixed(0)}% ／ 自然な彩度 +${(50*d/4).toFixed(0)}%`
+                     : `彩度 −${(60*Math.abs(d)/4).toFixed(0)}% ／ 白混ぜ ${(16*Math.abs(d)/4).toFixed(0)}%`,
+  form:   d => d > 0 ? `階調量子化 ${Math.max(4, Math.round(26-20*d/4))} 段 ／ 面統合ぼかし r=${(1+3*d/4).toFixed(1)}`
+                     : `ディテール強調 ${(1.2*Math.abs(d)/4).toFixed(2)}（r=2）`,
+  matter: d => d > 0 ? `局所コントラスト +${(70*d/4).toFixed(0)}% ／ 粒状 ${(10*d/4).toFixed(1)}%`
+                     : `表面平滑化 ${(85*Math.abs(d)/4).toFixed(0)}%`,
+  surp:   d => d > 0 ? `スプリットトーン ${(.55*d/4).toFixed(2)} ／ 色ずれ ${d/4 > .5 ? "有" : "無"}`
+                     : `色相の収束 ${(60*Math.abs(d)/4).toFixed(0)}%`
+};
+
+function buildOutput(){
+  const d = deltas();
+  const moved = AXES.filter(a => d[a.key] !== 0);
+
+  const ul = $("recipe");
+  const pix = moved.filter(a => a.engine === "pixel");
+  ul.innerHTML = pix.length
+    ? pix.map(a => `<li><b>${d[a.key] > 0 ? "+" : "−"}${Math.abs(d[a.key])}</b><span>${a.name}：${OPS[a.key](d[a.key])}</span></li>`).join("")
+    : `<li class="empty">目標を現状からずらすと、ここに画像処理の内訳が出ます。</li>`;
+
+  const L = [];
+  L.push(`■ 改変指示書 ─ 感性デザイン9項目`);
+  L.push(`対象：${state.label}`);
+  L.push("");
+  L.push(`【現状プロファイル】`);
+  L.push(AXES.map(a => `${a.name} ${state.now[a.key]}`).join(" / "));
+  L.push(`【目標プロファイル】`);
+  L.push(AXES.map(a => `${a.name} ${state.goal[a.key]}`).join(" / "));
+  L.push("");
+  if (!moved.length){
+    L.push("差分なし。現状維持。");
+  } else {
+    L.push(`【動かす項目（${moved.length}）】`);
+    moved.forEach(a => {
+      const dv = d[a.key];
+      L.push(`・${a.name}（${state.now[a.key]}→${state.goal[a.key]}）`);
+      L.push(`  意図：${dv > 0 ? (a.bUp || a.up) : (a.bDown || a.down)}`);
+      if (a.engine === "pixel") L.push(`  画像処理：${OPS[a.key](dv)}`);
+    });
+    const keep = AXES.filter(a => d[a.key] === 0).map(a => a.name);
+    if (keep.length){ L.push(""); L.push(`【動かさない項目】${keep.join("、")}`); }
+  }
+  L.push("");
+  L.push(`【生成AIへの一文】`);
+  L.push(promptLine(moved, d));
+  $("brief").value = L.join("\n");
+}
+
+function promptLine(moved, d){
+  if (!moved.length) return "この画像の印象を保ったまま再現する。";
+  const parts = moved.map(a => (d[a.key] > 0 ? (a.bUp || a.up) : (a.bDown || a.down)));
+  return `この画像の被写体・構図・用途は変えずに、${parts.join("、")}。他の感性項目は現状のまま維持すること。`;
+}
+
+/* ── 派生案 ── */
+const VARIANTS = 8;
+function drawVariants(){
+  const box = $("variants");
+  const { w, h, data } = state.src;
+  const tw = 150, th = Math.max(1, Math.round(h * tw / w));
+  const small = document.createElement("canvas");
+  small.width = tw; small.height = th;
+  const sctx = small.getContext("2d", { willReadFrequently:true });
+  const full = document.createElement("canvas");
+  full.width = w; full.height = h;
+  full.getContext("2d").putImageData(new ImageData(new Uint8ClampedArray(data), w, h), 0, 0);
+  sctx.drawImage(full, 0, 0, tw, th);
+  const base = sctx.getImageData(0, 0, tw, th).data;
+
+  box.innerHTML = "";
+  const rnd = rand(97);
+  for (let v = 0; v < VARIANTS; v++){
+    const g = { ...state.goal };
+    const picks = PIXEL_KEYS.slice().sort(() => rnd() - .5).slice(0, 2);
+    picks.forEach(k => {
+      const step = rnd() < .5 ? -1 : 1;
+      g[k] = Math.max(1, Math.min(5, g[k] + step * (rnd() < .35 ? 2 : 1)));
+    });
+    const dv = Object.fromEntries(AXES.map(a => [a.key, g[a.key] - state.now[a.key]]));
+    const px = renderPixels(base, tw, th, dv);
+    const btn = document.createElement("button");
+    btn.className = "variant"; btn.type = "button";
+    const c = document.createElement("canvas");
+    c.width = tw; c.height = th;
+    c.getContext("2d").putImageData(new ImageData(px, tw, th), 0, 0);
+    const label = picks.map(k => {
+      const diff = g[k] - state.goal[k];
+      return `${AX[k].name}${diff > 0 ? "+" : "−"}${Math.abs(diff) || 0}`;
+    }).filter(s => !/[+−]0$/.test(s)).join(" ") || "微差";
+    btn.appendChild(c);
+    const cap = document.createElement("span");
+    cap.textContent = label;
+    btn.appendChild(cap);
+    btn.title = `目標に採用：${label}`;
+    btn.addEventListener("click", () => { state.goal = g; drawAll(); });
+    box.appendChild(btn);
+  }
+}
+
+/* ── まとめて更新 ── */
+function drawAll(){
+  syncAxes();
+  drawRadar();
+  buildOutput();
+  clearTimeout(renderTimer);
+  drawViewport();
+  renderTimer = setTimeout(drawVariants, 90);
+}
+
+/* ── 操作 ── */
+function setMode(m){
+  state.mode = m;
+  $("mode-now").setAttribute("aria-pressed", m === "now");
+  $("mode-goal").setAttribute("aria-pressed", m === "goal");
+  $("mode-hint").textContent = m === "now"
+    ? "いま目の前にあるデザインを 1〜5 で評価します。読み込み時の値は画像解析による推定値なので、目で見て直してください。"
+    : "こうしたい、という到達点を 1〜5 で置きます。現状との差分がそのまま改変の指示になります。";
+  syncAxes();
+}
+$("mode-now").addEventListener("click", () => setMode("now"));
+$("mode-goal").addEventListener("click", () => setMode("goal"));
+
+$("wipe").addEventListener("input", e => {
+  state.wipe = +e.target.value;
+  $("wipe-val").textContent = state.wipe + "%";
+  drawViewport();
+});
+
+$("btn-open").addEventListener("click", () => $("file").click());
+$("file").addEventListener("change", e => loadFile(e.target.files[0]));
+$("btn-sample").addEventListener("click", () => loadCanvas(makeSample(), "見本：椅子（手続き生成）"));
+$("btn-reset").addEventListener("click", () => { state.goal = { ...state.now }; drawAll(); });
+
+$("btn-save").addEventListener("click", () => {
+  const { w, h } = state.src;
+  const c = document.createElement("canvas");
+  c.width = w; c.height = h;
+  c.getContext("2d").putImageData(new ImageData(new Uint8ClampedArray(processed), w, h), 0, 0);
+  const a = document.createElement("a");
+  a.download = "kansei-morph.png"; a.href = c.toDataURL("image/png"); a.click();
+});
+
+$("btn-copy").addEventListener("click", async () => {
+  const btn = $("btn-copy");
+  try { await navigator.clipboard.writeText($("brief").value); btn.textContent = "コピーしました"; }
+  catch { $("brief").select(); btn.textContent = "選択しました。手動でコピーしてください"; }
+  setTimeout(() => btn.textContent = "指示書をコピー", 1800);
+});
+
+$("btn-json").addEventListener("click", () => {
+  const d = deltas();
+  const payload = {
+    framework: "感性デザイン9項目（山岡俊樹）",
+    target: state.label,
+    profile: AXES.map(a => ({
+      no:a.no, name:a.name, engine:a.engine,
+      now:state.now[a.key], goal:state.goal[a.key], delta:d[a.key],
+      operation: d[a.key] === 0 ? null : (a.engine === "pixel" ? OPS[a.key](d[a.key]) : (d[a.key] > 0 ? a.bUp : a.bDown))
+    })),
+    prompt: promptLine(AXES.filter(a => d[a.key] !== 0), d)
+  };
+  const blob = new Blob([JSON.stringify(payload, null, 2)], { type:"application/json" });
+  const a = document.createElement("a");
+  a.download = "kansei-recipe.json"; a.href = URL.createObjectURL(blob); a.click();
+  setTimeout(() => URL.revokeObjectURL(a.href), 4000);
+});
+
+/* ドラッグ＆ドロップ／貼り付け */
+const dz = $("dropzone"), vp = $("viewport");
+["dragenter", "dragover"].forEach(t => vp.addEventListener(t, e => { e.preventDefault(); dz.classList.add("on"); }));
+["dragleave", "drop"].forEach(t => vp.addEventListener(t, e => { e.preventDefault(); dz.classList.remove("on"); }));
+vp.addEventListener("drop", e => { if (e.dataTransfer.files[0]) loadFile(e.dataTransfer.files[0]); });
+window.addEventListener("paste", e => {
+  const item = [...(e.clipboardData?.items || [])].find(i => i.type.startsWith("image/"));
+  if (item) loadFile(item.getAsFile());
+});
+
+/* 起動 */
+setMode("goal");
+buildAxes();
+loadCanvas(makeSample(), "見本：椅子（手続き生成）");
+state.goal.color = Math.min(5, state.now.color + 1);
+state.goal.matter = Math.min(5, state.now.matter + 1);
+drawAll();
+</script>
+</body>
+</html>
