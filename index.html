@@ -6,128 +6,169 @@
 <title>感性モーフ ─ 感性デザイン9項目による画像改変プロトタイプ</title>
 <style>
 :root{
-  --paper:#EAEBE6; --surface:#F5F6F2; --sunk:#E1E3DC;
-  --line:#C6C9C0; --line-soft:#D8DAD2;
-  --ink:#191C1A; --ink-2:#4B514B; --ink-3:#7D847C;
-  --now:#1F4C5C; --goal:#9A6B24;
-  --pos:#2F6E4E; --neg:#A0442E;
-  --font-ui:"Hiragino Kaku Gothic ProN","Yu Gothic Medium","Yu Gothic","Noto Sans JP",system-ui,sans-serif;
-  --font-display:"Hiragino Mincho ProN","Yu Mincho","YuMincho","Noto Serif JP",serif;
-  --font-mono:ui-monospace,"SF Mono",Menlo,Consolas,monospace;
+  /* Notion 風のトークン：白地・淡い罫・青のアクセント */
+  --paper:#FFFFFF; --surface:#FFFFFF; --sub:#F7F6F3; --sunk:#F7F6F3;
+  --line:rgba(55,53,47,.16); --line-soft:rgba(55,53,47,.09);
+  --hover:rgba(55,53,47,.06);
+  --ink:#37352F; --ink-2:#5F5C56; --ink-3:#9B9A97;
+  --now:#2383E2; --goal:#D9730D;
+  --pos:#0F7B6C; --neg:#E03E3E;
+  --tint-now:rgba(35,131,226,.12); --tint-goal:rgba(217,115,13,.12);
+  --tint-warn:rgba(224,62,62,.09);
+  --shadow:0 1px 2px rgba(15,15,15,.08), 0 2px 6px rgba(15,15,15,.05);
+  --font-ui:-apple-system,BlinkMacSystemFont,"Segoe UI","Hiragino Kaku Gothic ProN","Hiragino Sans","Yu Gothic","Noto Sans JP",Arial,sans-serif;
+  --font-display:var(--font-ui);
+  --font-mono:"SFMono-Regular",Menlo,Consolas,"Liberation Mono",monospace;
 }
 @media (prefers-color-scheme:dark){
   :root{
-    --paper:#121412; --surface:#1A1D1A; --sunk:#0D0F0D;
-    --line:#343830; --line-soft:#262a24;
-    --ink:#E8EAE3; --ink-2:#A8AEA5; --ink-3:#767C74;
-    --now:#79B6C6; --goal:#D9A64E;
-    --pos:#6FB98C; --neg:#DE8869;
+    --paper:#191919; --surface:#191919; --sub:#202020; --sunk:#252525;
+    --line:rgba(255,255,255,.14); --line-soft:rgba(255,255,255,.075);
+    --hover:rgba(255,255,255,.055);
+    --ink:#E9E9E7; --ink-2:#B4B3AE; --ink-3:#8C8B88;
+    --now:#529CCA; --goal:#D9A34A;
+    --pos:#4DAB9A; --neg:#FF7369;
+    --tint-now:rgba(82,156,202,.16); --tint-goal:rgba(217,163,74,.16);
+    --tint-warn:rgba(255,115,105,.12);
+    --shadow:0 1px 2px rgba(0,0,0,.4), 0 2px 8px rgba(0,0,0,.3);
   }
 }
 :root[data-theme="dark"]{
-  --paper:#121412; --surface:#1A1D1A; --sunk:#0D0F0D;
-  --line:#343830; --line-soft:#262a24;
-  --ink:#E8EAE3; --ink-2:#A8AEA5; --ink-3:#767C74;
-  --now:#79B6C6; --goal:#D9A64E;
-  --pos:#6FB98C; --neg:#DE8869;
+  --paper:#191919; --surface:#191919; --sub:#202020; --sunk:#252525;
+  --line:rgba(255,255,255,.14); --line-soft:rgba(255,255,255,.075);
+  --hover:rgba(255,255,255,.055);
+  --ink:#E9E9E7; --ink-2:#B4B3AE; --ink-3:#8C8B88;
+  --now:#529CCA; --goal:#D9A34A;
+  --pos:#4DAB9A; --neg:#FF7369;
+  --tint-now:rgba(82,156,202,.16); --tint-goal:rgba(217,163,74,.16);
+  --tint-warn:rgba(255,115,105,.12);
+  --shadow:0 1px 2px rgba(0,0,0,.4), 0 2px 8px rgba(0,0,0,.3);
 }
 :root[data-theme="light"]{
-  --paper:#EAEBE6; --surface:#F5F6F2; --sunk:#E1E3DC;
-  --line:#C6C9C0; --line-soft:#D8DAD2;
-  --ink:#191C1A; --ink-2:#4B514B; --ink-3:#7D847C;
-  --now:#1F4C5C; --goal:#9A6B24;
-  --pos:#2F6E4E; --neg:#A0442E;
+  --paper:#FFFFFF; --surface:#FFFFFF; --sub:#F7F6F3; --sunk:#F7F6F3;
+  --line:rgba(55,53,47,.16); --line-soft:rgba(55,53,47,.09);
+  --hover:rgba(55,53,47,.06);
+  --ink:#37352F; --ink-2:#5F5C56; --ink-3:#9B9A97;
+  --now:#2383E2; --goal:#D9730D;
+  --pos:#0F7B6C; --neg:#E03E3E;
+  --tint-now:rgba(35,131,226,.12); --tint-goal:rgba(217,115,13,.12);
+  --tint-warn:rgba(224,62,62,.09);
+  --shadow:0 1px 2px rgba(15,15,15,.08), 0 2px 6px rgba(15,15,15,.05);
 }
 *{box-sizing:border-box}
 [hidden]{display:none !important}
 html,body{height:100%}
 body{
   margin:0; background:var(--paper); color:var(--ink);
-  font-family:var(--font-ui); font-size:13px; line-height:1.7;
+  font-family:var(--font-ui); font-size:14px; line-height:1.6;
   -webkit-font-smoothing:antialiased;
 }
-button,input,select{font:inherit;color:inherit}
+button,input,select,textarea{font:inherit; color:inherit}
 button{cursor:pointer}
-:focus-visible{outline:2px solid var(--goal); outline-offset:2px}
+:focus-visible{outline:2px solid var(--now); outline-offset:1px; border-radius:4px}
 
-/* ── 見出し帯 ── */
+/* ── ページ見出し ── */
 .masthead{
-  display:flex; align-items:baseline; gap:18px; flex-wrap:wrap;
-  padding:14px 20px 12px; border-bottom:1px solid var(--line);
-  background:var(--surface);
+  display:flex; align-items:center; gap:12px; flex-wrap:wrap;
+  padding:11px 20px; background:var(--surface); border-bottom:1px solid var(--line-soft);
 }
-.masthead h1{
-  margin:0; font-family:var(--font-display); font-weight:600;
-  font-size:19px; letter-spacing:.06em;
-}
-.masthead .sub{color:var(--ink-3); font-size:11.5px; letter-spacing:.04em}
+.masthead h1{margin:0; font-size:15px; font-weight:600; letter-spacing:0}
+.masthead .sub{color:var(--ink-3); font-size:12.5px}
 .masthead .spacer{flex:1 1 auto}
-.tools{display:flex; gap:8px; align-items:center; flex-wrap:wrap}
+.tools{display:flex; gap:6px; align-items:center; flex-wrap:wrap}
 .btn{
-  border:1px solid var(--line); background:transparent; color:var(--ink);
-  padding:5px 12px; border-radius:2px; font-size:12px; letter-spacing:.03em;
-  transition:background .15s,border-color .15s;
+  border:1px solid var(--line); background:var(--surface); color:var(--ink);
+  padding:4px 11px; border-radius:4px; font-size:13px; font-weight:500;
+  transition:background .12s, border-color .12s;
 }
-.btn:hover{background:var(--sunk); border-color:var(--ink-3)}
-.btn.primary{background:var(--now); border-color:var(--now); color:var(--surface)}
-.btn.primary:hover{filter:brightness(1.12)}
-.btn.mini{padding:3px 8px; font-size:11px}
+.btn:hover{background:var(--hover)}
+.btn.primary{background:var(--now); border-color:transparent; color:#fff}
+.btn.primary:hover{filter:brightness(1.07); background:var(--now)}
+.btn.mini{padding:3px 9px; font-size:12.5px}
 
-/* ── 3面構成 ── */
+/* ── 工程タブ ── */
+.tabbar{
+  display:flex; align-items:center; gap:2px; flex-wrap:wrap;
+  padding:0 14px; background:var(--surface); border-bottom:1px solid var(--line-soft);
+}
+.tab{
+  border:0; background:transparent; color:var(--ink-2);
+  padding:9px 10px 8px; margin-bottom:-1px; font-size:13.5px; font-weight:500;
+  border-bottom:2px solid transparent; border-radius:4px 4px 0 0;
+  transition:color .12s, background .12s;
+}
+.tab:hover{background:var(--hover); color:var(--ink)}
+.tab[aria-selected="true"]{color:var(--ink); font-weight:600; border-bottom-color:var(--ink)}
+.tabbar .presets{margin-left:auto; padding:6px 0}
+.presets{display:flex; gap:5px; flex-wrap:wrap; align-items:center}
+.chip{
+  border:0; background:var(--hover); color:var(--ink-2);
+  padding:3px 9px; border-radius:3px; font-size:12.5px; line-height:1.5;
+  transition:background .12s, color .12s;
+}
+.chip:hover{background:var(--line-soft); color:var(--ink)}
+.chip[aria-pressed="true"]{background:var(--tint-now); color:var(--now); font-weight:600}
+
+/* ── 面の構成 ── */
 .deck{
-  display:grid; grid-template-columns:minmax(300px,340px) minmax(0,1fr);
+  display:grid; grid-template-columns:minmax(300px,336px) minmax(0,1fr);
   align-items:stretch; min-height:calc(100vh - 92px);
 }
 .panel{display:flex; flex-direction:column; min-width:0}
-.panel + .panel{border-left:1px solid var(--line)}
+.deck.no-rail{grid-template-columns:minmax(0,1fr)}
+.deck.no-rail .panel.ledger{display:none}
+.panel.ledger{background:var(--sub); border-right:1px solid var(--line-soft)}
 .panel-head{
   display:flex; align-items:center; gap:10px; justify-content:space-between;
-  padding:11px 16px 9px; border-bottom:1px solid var(--line-soft);
+  padding:14px 18px 8px;
 }
-.panel-head h2{
-  margin:0; font-family:var(--font-display); font-size:14px;
-  font-weight:600; letter-spacing:.09em;
-}
-.panel-head .cap{font-size:10.5px; color:var(--ink-3); letter-spacing:.06em}
-.panel-body{padding:12px 16px 20px; overflow:auto; flex:1 1 auto}
+.panel-head h2{margin:0; font-size:15px; font-weight:600}
+.panel-head .cap{font-size:12px; color:var(--ink-3)}
+.panel-body{padding:6px 18px 24px; overflow:auto; flex:1 1 auto}
+.pane{display:none; flex-direction:column; min-height:0; flex:1 1 auto}
+.pane.on{display:flex}
+.pane-body{padding:6px 20px 26px; overflow:auto; flex:1 1 auto; display:flex; flex-direction:column; gap:16px}
 
-/* ── 評価／目標の切替 ── */
-.modeswitch{display:flex; border:1px solid var(--line); border-radius:2px; overflow:hidden}
+/* ── 切替（セグメント） ── */
+.modeswitch{display:flex; gap:2px; background:var(--sunk); padding:2px; border-radius:6px}
 .modeswitch button{
-  border:0; background:transparent; padding:4px 10px; font-size:11px;
-  letter-spacing:.04em; color:var(--ink-2);
+  border:0; background:transparent; padding:3px 10px; border-radius:4px;
+  font-size:12.5px; color:var(--ink-2); transition:background .12s, color .12s;
 }
-.modeswitch button[aria-pressed="true"]{background:var(--ink); color:var(--paper)}
+.modeswitch button:hover{color:var(--ink)}
+.modeswitch button[aria-pressed="true"]{background:var(--surface); color:var(--ink); font-weight:600; box-shadow:var(--shadow)}
+
+/* ── コールアウト ── */
 .hint{
-  font-size:11px; color:var(--ink-3); margin:0 0 12px;
-  padding-left:9px; border-left:2px solid var(--line);
+  margin:0 0 14px; padding:10px 12px; border-radius:4px;
+  background:var(--sunk); color:var(--ink-2); font-size:13px;
 }
 
-/* ── 台帳の行 ── */
-.axis{padding:9px 0 11px; border-bottom:1px dotted var(--line-soft)}
+/* ── 9項目の行 ── */
+.axis{padding:11px 0 12px; border-bottom:1px solid var(--line-soft)}
 .axis:last-child{border-bottom:0}
-.axis-top{display:flex; align-items:baseline; gap:8px}
-.axis-no{font-family:var(--font-mono); font-size:10.5px; color:var(--ink-3); width:16px}
-.axis-name{font-family:var(--font-display); font-size:14.5px; letter-spacing:.05em}
+.axis-top{display:flex; align-items:center; gap:7px}
+.axis-no{font-family:var(--font-mono); font-size:11px; color:var(--ink-3); width:14px}
+.axis-name{font-size:14px; font-weight:600}
 .tag{
-  font-size:9.5px; letter-spacing:.08em; padding:1px 5px; border-radius:1px;
-  border:1px solid var(--line); color:var(--ink-3); white-space:nowrap;
+  font-size:11px; padding:1px 6px; border-radius:3px; white-space:nowrap;
+  background:var(--hover); color:var(--ink-3);
 }
-.tag.pixel{border-color:var(--now); color:var(--now)}
+.tag.pixel{background:var(--tint-now); color:var(--now)}
 .axis-delta{
-  margin-left:auto; font-family:var(--font-mono); font-size:12px;
+  margin-left:auto; font-family:var(--font-mono); font-size:12.5px;
   font-variant-numeric:tabular-nums; color:var(--ink-3);
 }
 .axis-delta.up{color:var(--pos)} .axis-delta.down{color:var(--neg)}
-.poles{display:flex; justify-content:space-between; font-size:10px; color:var(--ink-3); margin:2px 0 1px}
+.poles{display:flex; justify-content:space-between; font-size:11.5px; color:var(--ink-3); margin:4px 0 0}
 .track{position:relative; height:22px}
-.track .rail{position:absolute; left:0; right:0; top:10px; height:1px; background:var(--line)}
-.track .ticks{position:absolute; left:0; right:0; top:7px; height:7px; display:flex; justify-content:space-between}
-.track .ticks i{width:1px; height:7px; background:var(--line)}
-.track .span{position:absolute; top:9px; height:3px; background:var(--goal); opacity:.55}
+.track .rail{position:absolute; left:0; right:0; top:9px; height:4px; border-radius:2px; background:var(--line-soft)}
+.track .ticks{position:absolute; left:0; right:0; top:9px; height:4px; display:flex; justify-content:space-between}
+.track .ticks i{width:1px; height:4px; background:var(--line)}
+.track .span{position:absolute; top:9px; height:4px; border-radius:2px; background:var(--goal); opacity:.75}
 .track .mark{
-  position:absolute; top:5px; width:9px; height:9px; margin-left:-4.5px;
-  border-radius:50%; border:1.5px solid var(--now); background:var(--paper);
+  position:absolute; top:6px; width:10px; height:10px; margin-left:-5px;
+  border-radius:50%; border:2px solid var(--now); background:var(--surface);
 }
 .track input[type=range]{
   position:absolute; inset:0; width:100%; margin:0; background:transparent;
@@ -136,190 +177,150 @@ button{cursor:pointer}
 .track input[type=range]::-webkit-slider-runnable-track{height:22px; background:transparent}
 .track input[type=range]::-moz-range-track{height:22px; background:transparent}
 .track input[type=range]::-webkit-slider-thumb{
-  -webkit-appearance:none; width:13px; height:13px; margin-top:4.5px; border-radius:2px;
-  background:var(--goal); border:1px solid var(--paper); cursor:ew-resize;
+  -webkit-appearance:none; width:14px; height:14px; margin-top:4px; border-radius:50%;
+  background:var(--goal); border:2px solid var(--surface); box-shadow:var(--shadow); cursor:pointer;
 }
 .track input[type=range]::-moz-range-thumb{
-  width:13px; height:13px; border-radius:2px; background:var(--goal);
-  border:1px solid var(--paper); cursor:ew-resize;
+  width:14px; height:14px; border-radius:50%; background:var(--goal);
+  border:2px solid var(--surface); box-shadow:var(--shadow); cursor:pointer;
 }
-.axis[data-mode="now"] input[type=range]::-webkit-slider-thumb{background:var(--now); border-radius:50%}
-.axis[data-mode="now"] input[type=range]::-moz-range-thumb{background:var(--now); border-radius:50%}
-.axis-note{font-size:10.5px; color:var(--ink-3); margin-top:3px; min-height:1.4em}
+.axis[data-mode="now"] input[type=range]::-webkit-slider-thumb{background:var(--now)}
+.axis[data-mode="now"] input[type=range]::-moz-range-thumb{background:var(--now)}
+.axis-note{font-size:12px; color:var(--ink-3); margin-top:4px; min-height:1.4em}
 
-/* ── 観測窓 ── */
-.stage-body{
-  flex:1 1 auto; display:flex; flex-direction:column; gap:12px;
-  padding:14px 18px 18px; min-height:0;
+/* ── 画像・3Dの舞台 ── */
+.stage-body{flex:1 1 auto; display:flex; flex-direction:column; gap:14px; padding:6px 20px 22px; min-height:0}
+.viewport, .stage3d{
+  position:relative; flex:1 1 auto; min-height:300px; display:grid; place-items:center;
+  background:var(--sunk); border:1px solid var(--line-soft); border-radius:6px; overflow:hidden;
 }
-.presets{display:flex; gap:6px; flex-wrap:wrap; align-items:center}
-.chip{
-  border:1px solid var(--line); background:transparent; color:var(--ink-2);
-  padding:3px 11px; border-radius:2px; font-size:11.5px; letter-spacing:.04em;
-  transition:border-color .15s,color .15s,background .15s;
+.viewport canvas, .stage3d canvas{max-width:100%; max-height:100%; display:block}
+.stage3d canvas{cursor:grab; touch-action:none}
+.stage3d canvas:active{cursor:grabbing}
+.viewport .badge, .stage3d .badge{
+  position:absolute; top:9px; font-family:var(--font-mono); font-size:11px;
+  color:var(--ink-2); background:var(--surface); border:1px solid var(--line-soft);
+  padding:2px 7px; border-radius:4px; box-shadow:var(--shadow);
 }
-.chip:hover{border-color:var(--ink-3); color:var(--ink)}
-.chip[aria-pressed="true"]{
-  background:var(--ink); border-color:var(--ink); color:var(--paper);
-}
-.viewport{
-  position:relative; flex:1 1 auto; min-height:280px; display:grid; place-items:center;
-  background:var(--sunk); border:1px solid var(--line-soft); overflow:hidden;
-}
-.viewport canvas{max-width:100%; max-height:100%; display:block}
-.viewport .badge{
-  position:absolute; top:8px; font-family:var(--font-mono); font-size:10px;
-  letter-spacing:.1em; color:var(--ink-3); background:var(--surface);
-  border:1px solid var(--line-soft); padding:1px 6px;
-}
-.viewport .badge.l{left:8px} .viewport .badge.r{right:8px}
-.dropzone{position:absolute; inset:0; display:grid; place-items:center; pointer-events:none}
-.dropzone.on{background:color-mix(in srgb,var(--goal) 16%,transparent); border:2px dashed var(--goal)}
-.wipe{display:flex; align-items:center; gap:10px; font-size:11px; color:var(--ink-3)}
+.viewport .badge.l, .stage3d .badge{left:9px} .viewport .badge.r{right:9px}
+.dropzone{position:absolute; inset:0; display:grid; place-items:center; pointer-events:none; border-radius:6px}
+.dropzone.on{background:var(--tint-now); border:2px dashed var(--now)}
+.wipe{display:flex; align-items:center; gap:10px; font-size:12.5px; color:var(--ink-3)}
 .wipe input[type=range]{flex:1 1 auto; accent-color:var(--now)}
 .readout{
-  display:flex; gap:18px; flex-wrap:wrap; font-family:var(--font-mono);
-  font-size:11px; color:var(--ink-3); font-variant-numeric:tabular-nums;
+  display:flex; gap:16px; flex-wrap:wrap; font-family:var(--font-mono);
+  font-size:11.5px; color:var(--ink-3); font-variant-numeric:tabular-nums;
 }
-
-/* ── 変異グリッド ── */
-.variants{display:grid; grid-template-columns:repeat(4,1fr); gap:6px}
+.variants{display:grid; grid-template-columns:repeat(4,1fr); gap:8px}
 .variant{
-  border:1px solid var(--line-soft); background:var(--sunk); padding:0;
-  display:flex; flex-direction:column; overflow:hidden; text-align:left;
+  border:1px solid var(--line-soft); background:var(--sunk); padding:0; border-radius:6px;
+  display:flex; flex-direction:column; overflow:hidden; text-align:left; transition:border-color .12s, box-shadow .12s;
 }
-.variant:hover{border-color:var(--goal)}
+.variant:hover{border-color:var(--now); box-shadow:var(--shadow)}
 .variant canvas{width:100%; height:auto; display:block}
 .variant span{
-  font-size:9.5px; padding:2px 4px; color:var(--ink-3); letter-spacing:.02em;
+  font-size:11px; padding:4px 6px; color:var(--ink-3);
   white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
 }
-
-/* ── 出力 ── */
-.radar{display:block; margin:0 auto 6px}
-.legend{display:flex; gap:14px; justify-content:center; font-size:10.5px; color:var(--ink-3); margin-bottom:14px}
-.legend i{display:inline-block; width:16px; height:0; border-top:2px solid; vertical-align:middle; margin-right:5px}
-.legend .n i{color:var(--now)} .legend .g i{color:var(--goal)}
-.block{margin-bottom:16px}
-.block h3{
-  margin:0 0 6px; font-size:11px; letter-spacing:.1em; color:var(--ink-3);
-  font-weight:500; display:flex; align-items:center; gap:8px;
-}
-.block h3::after{content:""; flex:1 1 auto; border-top:1px solid var(--line-soft)}
-.recipe{list-style:none; margin:0; padding:0; font-size:11.5px}
-.recipe li{display:flex; gap:8px; padding:3px 0; border-bottom:1px dotted var(--line-soft)}
-.recipe li:last-child{border-bottom:0}
-.recipe b{
-  font-family:var(--font-mono); font-size:10.5px; font-weight:400; color:var(--ink-3);
-  min-width:36px; font-variant-numeric:tabular-nums;
-}
-.brief{
-  width:100%; min-height:190px; resize:vertical; background:var(--sunk);
-  border:1px solid var(--line-soft); border-radius:2px; padding:10px;
-  font-family:var(--font-mono); font-size:11px; line-height:1.75; color:var(--ink);
-}
-.row{display:flex; gap:8px; flex-wrap:wrap}
-.empty{color:var(--ink-3); font-size:11.5px}
-
-/* ── 工程タブ ── */
-.tabbar{
-  display:flex; align-items:center; gap:2px; flex-wrap:wrap;
-  padding:0 20px; background:var(--surface); border-bottom:1px solid var(--line);
-}
-.tab{
-  border:0; background:transparent; padding:10px 15px 8px; color:var(--ink-3);
-  font-family:var(--font-display); font-size:13px; letter-spacing:.1em;
-  border-bottom:2px solid transparent; transition:color .15s,border-color .15s;
-}
-.tab:hover{color:var(--ink-2)}
-.tab[aria-selected="true"]{color:var(--ink); border-bottom-color:var(--goal)}
-.tabbar .presets{margin-left:auto; padding:6px 0}
-.pane{display:none; flex-direction:column; min-height:0; flex:1 1 auto}
-.pane.on{display:flex}
-.pane-body{padding:12px 18px 22px; overflow:auto; flex:1 1 auto; display:flex; flex-direction:column; gap:14px}
+.parts{display:flex; flex-wrap:wrap; gap:6px 16px; font-size:12px; color:var(--ink-3)}
+.parts span{display:flex; align-items:center; gap:6px}
+.parts i{width:10px; height:10px; border-radius:3px}
 
 /* ── 調査 ── */
-.mapbar{display:flex; gap:10px; align-items:center; flex-wrap:wrap; font-size:11px; color:var(--ink-3)}
+.mapbar{display:flex; gap:10px; align-items:center; flex-wrap:wrap; font-size:12.5px; color:var(--ink-3)}
 .mapbar select{
-  background:var(--surface); border:1px solid var(--line); border-radius:2px;
-  padding:3px 6px; font-size:11.5px; color:var(--ink);
+  background:var(--surface); border:1px solid var(--line); border-radius:4px;
+  padding:3px 7px; font-size:13px; color:var(--ink);
 }
-.maprow{display:grid; grid-template-columns:minmax(0,1fr) 190px; gap:14px; align-items:start}
-#map{width:100%; height:auto; background:var(--sunk); border:1px solid var(--line-soft)}
-.maplegend{display:flex; flex-direction:column; gap:4px; font-size:11px}
+.maprow{display:grid; grid-template-columns:minmax(0,1fr) 200px; gap:16px; align-items:start}
+#map{width:100%; height:auto; max-height:calc(100vh - 250px); background:var(--surface);
+     border:1px solid var(--line-soft); border-radius:6px}
+.maplegend{display:flex; flex-direction:column; gap:2px; font-size:12.5px}
 .maplegend button{
-  display:flex; align-items:center; gap:7px; border:0; background:transparent;
-  color:var(--ink-2); padding:2px 0; text-align:left; font-size:11px;
+  display:flex; align-items:center; gap:8px; border:0; background:transparent;
+  color:var(--ink-2); padding:4px 7px; border-radius:4px; text-align:left; font-size:12.5px;
 }
-.maplegend button[aria-pressed="false"]{opacity:.35}
+.maplegend button:hover{background:var(--hover)}
+.maplegend button[aria-pressed="false"]{opacity:.4}
 .maplegend i{width:9px; height:9px; border-radius:50%; flex:0 0 auto}
-.maplegend b{margin-left:auto; font-family:var(--font-mono); font-size:10px; font-weight:400; color:var(--ink-3)}
-.cattable{display:flex; flex-direction:column; gap:5px}
-.catrow{display:grid; grid-template-columns:132px 34px minmax(0,300px); gap:9px; align-items:center; font-size:11.5px}
-.catrow .mini-bars{display:flex; gap:2px; height:22px; align-items:stretch}
-.catrow .mini-bars span{flex:1 1 0; background:var(--line-soft); position:relative}
+.maplegend b{margin-left:auto; font-family:var(--font-mono); font-size:11px; font-weight:400; color:var(--ink-3)}
+.cattable{display:flex; flex-direction:column}
+.catrow{
+  display:grid; grid-template-columns:150px 44px minmax(0,300px); gap:10px; align-items:center;
+  font-size:13px; padding:5px 7px; border-radius:4px;
+}
+.catrow:hover{background:var(--hover)}
+.catrow .mini-bars{display:flex; gap:2px; height:20px; align-items:stretch}
+.catrow .mini-bars span{flex:1 1 0; background:var(--line-soft); position:relative; border-radius:2px; overflow:hidden}
 .catrow .mini-bars span i{position:absolute; left:0; right:0; bottom:0; background:var(--now); display:block}
-.catrow em{font-family:var(--font-mono); font-style:normal; font-size:10.5px; color:var(--ink-3); font-variant-numeric:tabular-nums}
+.catrow em{font-family:var(--font-mono); font-style:normal; font-size:11.5px; color:var(--ink-3); font-variant-numeric:tabular-nums}
 
 /* ── コンセプト ── */
-.advice{display:flex; flex-direction:column; gap:9px}
-.card{border:1px solid var(--line-soft); border-left:3px solid var(--goal); padding:10px 13px; background:var(--surface)}
-.card.warn{border-left-color:var(--neg)}
-.card-top{display:flex; align-items:baseline; gap:9px}
-.card-top strong{font-family:var(--font-display); font-size:15px; letter-spacing:.05em; font-weight:600}
-.card-top .move{
-  font-family:var(--font-mono); font-size:11.5px; color:var(--pos);
-  font-variant-numeric:tabular-nums;
+.advice{display:flex; flex-direction:column; gap:8px}
+.card{background:var(--sunk); border-radius:6px; padding:12px 14px}
+.card.warn{background:var(--tint-warn)}
+.card-top{display:flex; align-items:center; gap:9px}
+.card-top strong{font-size:14.5px; font-weight:600}
+.card-top .move{font-family:var(--font-mono); font-size:12.5px; color:var(--pos); font-variant-numeric:tabular-nums}
+.card-top .rank{
+  font-family:var(--font-mono); font-size:11px; color:var(--ink-3);
+  width:18px; height:18px; border-radius:4px; background:var(--hover);
+  display:grid; place-items:center;
 }
-.card-top .rank{font-family:var(--font-mono); font-size:10.5px; color:var(--ink-3)}
 .card-top .btn{margin-left:auto}
-.card p{margin:5px 0 0; font-size:11.5px; color:var(--ink-2)}
-.factors{display:flex; gap:14px; margin-top:7px; font-family:var(--font-mono); font-size:10.5px; color:var(--ink-3)}
-.factors span{display:flex; align-items:center; gap:5px}
-.factors u{
-  display:inline-block; width:44px; height:4px; background:var(--line);
-  text-decoration:none; position:relative;
-}
+.card p{margin:6px 0 0; font-size:13px; color:var(--ink-2)}
+.factors{display:flex; gap:16px; margin-top:8px; font-family:var(--font-mono); font-size:11.5px; color:var(--ink-3); flex-wrap:wrap}
+.factors span{display:flex; align-items:center; gap:6px}
+.factors u{display:inline-block; width:46px; height:4px; border-radius:2px; background:var(--line-soft); text-decoration:none; position:relative; overflow:hidden}
 .factors u i{position:absolute; left:0; top:0; bottom:0; background:var(--goal)}
 
-/* ── 可視化 ── */
-.stage3d{
-  position:relative; flex:1 1 auto; min-height:320px; display:grid; place-items:center;
-  background:var(--sunk); border:1px solid var(--line-soft); overflow:hidden;
+/* ── 見出し・記述ブロック ── */
+.block{margin-bottom:18px}
+.block h3{margin:0 0 8px; font-size:12.5px; font-weight:600; color:var(--ink-3)}
+.recipe{list-style:none; margin:0; padding:0; font-size:13px}
+.recipe li{display:flex; gap:10px; padding:5px 0; border-bottom:1px solid var(--line-soft)}
+.recipe li:last-child{border-bottom:0}
+.recipe b{
+  font-family:var(--font-mono); font-size:11.5px; font-weight:400; color:var(--ink-3);
+  min-width:34px; font-variant-numeric:tabular-nums;
 }
-.stage3d canvas{max-width:100%; max-height:100%; display:block; cursor:grab; touch-action:none}
-.stage3d canvas:active{cursor:grabbing}
-.stage3d .badge{
-  position:absolute; left:8px; top:8px; font-family:var(--font-mono); font-size:10px;
-  letter-spacing:.08em; color:var(--ink-3); background:var(--surface);
-  border:1px solid var(--line-soft); padding:1px 6px;
+.brief{
+  width:100%; min-height:200px; resize:vertical; background:var(--sunk);
+  border:1px solid var(--line-soft); border-radius:6px; padding:12px;
+  font-family:var(--font-mono); font-size:12px; line-height:1.7; color:var(--ink);
 }
-.parts{display:flex; flex-wrap:wrap; gap:5px 14px; font-size:10.5px; color:var(--ink-3)}
-.parts span{display:flex; align-items:center; gap:5px}
-.parts i{width:9px; height:9px; border:1px solid rgba(0,0,0,.2)}
+.brief:focus{background:var(--surface); border-color:var(--now); outline:none}
+.row{display:flex; gap:6px; flex-wrap:wrap}
+.empty{color:var(--ink-3); font-size:13px}
 
 /* ── 評価 ── */
-.evalgrid{display:grid; grid-template-columns:300px minmax(0,1fr); gap:20px; align-items:start}
-.checks{list-style:none; margin:0; padding:0; font-size:11.5px}
-.checks li{display:flex; gap:9px; padding:5px 0; border-bottom:1px dotted var(--line-soft); align-items:baseline}
+.radar{display:block; margin:0 auto 4px}
+.legend{display:flex; gap:16px; justify-content:center; font-size:12px; color:var(--ink-3); margin-bottom:18px}
+.legend i{display:inline-block; width:16px; height:0; border-top:2px solid; vertical-align:middle; margin-right:6px}
+.legend .n i{color:var(--now)} .legend .g i{color:var(--goal)}
+.evalgrid{display:grid; grid-template-columns:300px minmax(0,1fr); gap:26px; align-items:start}
+.checks{list-style:none; margin:0; padding:0; font-size:13px}
+.checks li{display:flex; gap:9px; padding:6px 0; align-items:baseline; border-bottom:1px solid var(--line-soft)}
 .checks li:last-child{border-bottom:0}
-.checks .mk{font-family:var(--font-mono); font-size:12px; width:14px; flex:0 0 auto}
+.checks .mk{font-family:var(--font-mono); font-size:12.5px; width:14px; flex:0 0 auto}
 .checks .ok .mk{color:var(--pos)} .checks .warn .mk{color:var(--goal)} .checks .ng .mk{color:var(--neg)}
-.saved{list-style:none; margin:0; padding:0; font-size:11.5px}
-.saved li{display:flex; gap:9px; align-items:center; padding:4px 0; border-bottom:1px dotted var(--line-soft)}
-.saved li b{font-weight:400; font-family:var(--font-display); font-size:13px}
-.saved li em{font-style:normal; color:var(--ink-3); font-size:10.5px; flex:1 1 auto; min-width:0}
-.saved li .btn{padding:1px 7px; font-size:10.5px}
+.saved{list-style:none; margin:0; padding:0; font-size:13px}
+.saved li{display:flex; gap:9px; align-items:center; padding:5px 7px; border-radius:4px}
+.saved li:hover{background:var(--hover)}
+.saved li b{font-weight:600; font-size:13px}
+.saved li em{font-style:normal; color:var(--ink-3); font-size:12px; flex:1 1 auto; min-width:0}
+.saved li .btn{padding:2px 8px; font-size:12px}
 
 @media (max-width:1180px){
   .deck{grid-template-columns:minmax(0,1fr)}
-  .panel + .panel{border-left:0; border-top:1px solid var(--line)}
+  .panel.ledger{border-right:0; border-bottom:1px solid var(--line-soft)}
   .evalgrid{grid-template-columns:minmax(0,1fr)}
   .maprow{grid-template-columns:minmax(0,1fr)}
-  .maplegend{flex-direction:row; flex-wrap:wrap; gap:4px 16px}
+  .maplegend{flex-direction:row; flex-wrap:wrap; gap:2px 10px}
 }
 @media (max-width:760px){
   .variants{grid-template-columns:repeat(3,1fr)}
+  .catrow{grid-template-columns:130px 40px minmax(0,1fr)}
 }
 @media (prefers-reduced-motion:reduce){*{transition:none !important}}
 </style>
@@ -383,7 +384,7 @@ button{cursor:pointer}
         <button class="btn mini" id="btn-corpus-json">コーパスを保存</button>
       </div>
       <div class="maprow">
-        <svg id="map" viewBox="0 0 540 470" role="img" aria-label="競合の分布図"></svg>
+        <svg id="map" viewBox="0 0 760 470" role="img" aria-label="競合の分布図"></svg>
         <div class="maplegend" id="map-legend"></div>
       </div>
       <div class="block">
@@ -577,6 +578,11 @@ const AXES = [
     bDown:"逸脱を戻し、用途から素直に導かれる見えにする" }
 ];
 const AX = Object.fromEntries(AXES.map(a => [a.key, a]));
+/* 評価の刻み。1〜5の5段階を基準に、その間を刻む */
+const STEP = .5;
+const snap = v => Math.max(1, Math.min(5, Math.round(v / STEP) * STEP));
+const fmt = v => Number.isInteger(v) ? String(v) : v.toFixed(1);
+const fmtd = d => (d > 0 ? "+" : "−") + fmt(Math.abs(d));
 const PIXEL_KEYS = AXES.filter(a => a.engine === "pixel").map(a => a.key);
 
 /* ── 状態 ── */
@@ -887,7 +893,7 @@ function estimate(src, w, h){
   edgeDen /= Math.max(1, en); micro /= Math.max(1, en);
 
   state.stats = { meanL, sdL, meanS, colorfulness, meanWarm, edgeDen, micro };
-  const sc = (v, lo, hi) => Math.max(1, Math.min(5, Math.round(1 + 4 * (v - lo) / (hi - lo))));
+  const sc = (v, lo, hi) => snap(1 + 4 * (v - lo) / (hi - lo));
   return {
     atmos:  sc(meanL * .6 + Math.max(0, meanWarm) * .8 + meanS * .3, .18, .78),
     image:  sc(sdL * 1.1 - meanWarm * .5 + (1 - meanS) * .25, .04, .55),
@@ -1336,7 +1342,7 @@ function drawViewport(){
   const moved = PIXEL_KEYS.filter(k => d[k] !== 0).length;
   $("readout").innerHTML =
     `<span>${state.label}</span><span>${w}×${h} px</span><span>描画 ${ms.toFixed(0)} ms</span>` +
-    `<span>可動 ${moved}/${PIXEL_KEYS.length} 項目</span><span>Σ|Δ| ${AXES.reduce((s,a)=>s+Math.abs(d[a.key]),0)}</span>`;
+    `<span>可動 ${moved}/${PIXEL_KEYS.length} 項目</span><span>Σ|Δ| ${fmt(AXES.reduce((s,a)=>s+Math.abs(d[a.key]),0))}</span>`;
 }
 
 /* ── 台帳 ── */
@@ -1359,7 +1365,7 @@ function buildAxes(){
         <span class="ticks"><i></i><i></i><i></i><i></i><i></i></span>
         <span class="span" data-span></span>
         <span class="mark" data-mark></span>
-        <input type="range" min="1" max="5" step="1" aria-label="${a.name}">
+        <input type="range" min="1" max="5" step="${STEP}" aria-label="${a.name}">
       </div>
       <div class="axis-note" data-note></div>`;
     const input = row.querySelector("input");
@@ -1387,7 +1393,7 @@ function syncAxes(){
     span.style.width = `calc(${(hi - lo) / 4 * 100}%)`;
     span.style.display = dv === 0 ? "none" : "block";
     const chip = row.querySelector("[data-d]");
-    chip.textContent = dv === 0 ? "±0" : (dv > 0 ? "+" : "−") + Math.abs(dv);
+    chip.textContent = dv === 0 ? "±0" : fmtd(dv);
     chip.className = "axis-delta" + (dv > 0 ? " up" : dv < 0 ? " down" : "");
     const note = row.querySelector("[data-note]");
     if (dv === 0) note.textContent = "";
@@ -1419,7 +1425,7 @@ function drawRadar(){
     s += `<line x1="${cx}" y1="${cy}" x2="${x.toFixed(1)}" y2="${y.toFixed(1)}" stroke="${ink}" stroke-width=".5"/>`;
     const lx = cx + (x - cx) * 1.16, ly = cy + (y - cy) * 1.16;
     const anchor = Math.abs(lx - cx) < 8 ? "middle" : lx > cx ? "start" : "end";
-    s += `<text x="${lx.toFixed(1)}" y="${(ly + 3.5).toFixed(1)}" font-size="10" fill="${ink3}" text-anchor="${anchor}" font-family="var(--font-ui)" letter-spacing=".02em">${SHORT[a.key]}</text>`;
+    s += `<text x="${lx.toFixed(1)}" y="${(ly + 3.5).toFixed(1)}" font-size="11" fill="${ink3}" text-anchor="${anchor}" font-family="sans-serif">${SHORT[a.key]}</text>`;
   });
   const poly = (get, color, dash) => {
     const p = AXES.map((a, i) => pt(i, get(a.key)).map(n => n.toFixed(1)).join(",")).join(" ");
@@ -1453,7 +1459,7 @@ function buildOutput(){
   const ul = $("recipe");
   const pix = moved.filter(a => a.engine === "pixel");
   ul.innerHTML = pix.length
-    ? pix.map(a => `<li><b>${d[a.key] > 0 ? "+" : "−"}${Math.abs(d[a.key])}</b><span>${a.name}：${OPS[a.key](d[a.key])}</span></li>`).join("")
+    ? pix.map(a => `<li><b>${fmtd(d[a.key])}</b><span>${a.name}：${OPS[a.key](d[a.key])}</span></li>`).join("")
     : `<li class="empty">目標を現状からずらすと、ここに画像処理の内訳が出ます。</li>`;
 
   const L = [];
@@ -1461,9 +1467,9 @@ function buildOutput(){
   L.push(`対象：${state.label}`);
   L.push("");
   L.push(`【現状プロファイル】`);
-  L.push(AXES.map(a => `${a.name} ${state.now[a.key]}`).join(" / "));
+  L.push(AXES.map(a => `${a.name} ${fmt(state.now[a.key])}`).join(" / "));
   L.push(`【目標プロファイル】`);
-  L.push(AXES.map(a => `${a.name} ${state.goal[a.key]}`).join(" / "));
+  L.push(AXES.map(a => `${a.name} ${fmt(state.goal[a.key])}`).join(" / "));
   L.push("");
   if (!moved.length){
     L.push("差分なし。現状維持。");
@@ -1471,7 +1477,7 @@ function buildOutput(){
     L.push(`【動かす項目（${moved.length}）】`);
     moved.forEach(a => {
       const dv = d[a.key];
-      L.push(`・${a.name}（${state.now[a.key]}→${state.goal[a.key]}）`);
+      L.push(`・${a.name}（${fmt(state.now[a.key])}→${fmt(state.goal[a.key])}）`);
       L.push(`  意図：${dv > 0 ? (a.bUp || a.up) : (a.bDown || a.down)}`);
       if (a.engine === "pixel") L.push(`  画像処理：${OPS[a.key](dv)}`);
     });
@@ -1512,7 +1518,7 @@ function drawVariants(){
     const picks = PIXEL_KEYS.slice().sort(() => rnd() - .5).slice(0, 2);
     picks.forEach(k => {
       const step = rnd() < .5 ? -1 : 1;
-      g[k] = Math.max(1, Math.min(5, g[k] + step * (rnd() < .35 ? 2 : 1)));
+      g[k] = snap(g[k] + step * (rnd() < .35 ? 1 : STEP));
     });
     const dv = Object.fromEntries(AXES.map(a => [a.key, g[a.key] - state.now[a.key]]));
     const px = renderPixels(base, tw, th, dv);
@@ -1523,8 +1529,8 @@ function drawVariants(){
     c.getContext("2d").putImageData(new ImageData(px, tw, th), 0, 0);
     const label = picks.map(k => {
       const diff = g[k] - state.goal[k];
-      return `${AX[k].name}${diff > 0 ? "+" : "−"}${Math.abs(diff) || 0}`;
-    }).filter(s => !/[+−]0$/.test(s)).join(" ") || "微差";
+      return diff === 0 ? "" : `${AX[k].name}${fmtd(diff)}`;
+    }).filter(Boolean).join(" ") || "微差";
     btn.appendChild(c);
     const cap = document.createElement("span");
     cap.textContent = label;
@@ -1602,7 +1608,8 @@ const CATS = {
     ["和・木工",     [2,1,2,3,4,2,5,2,2], 4]
   ]
 };
-const CAT_COLORS = ["#2E6E82","#9A6B24","#5E7A4F","#8A4A3C","#4A4E7A","#7A6B8A","#7E6A3A"];
+/* Notion のタグ色に合わせた分類色 */
+const CAT_COLORS = ["#2383E2","#D9730D","#0F7B6C","#E03E3E","#6940A5","#AD1A72","#8B6B4E"];
 /* 画像から推定できる軸。実写・収集画像はこの5項目しか値を持たない */
 const MEASURABLE = ["atmos", "image", "color", "form", "matter"];
 
@@ -1727,7 +1734,7 @@ function fillAxisSelects(){
 function drawMap(){
   const id = state.preset || "chair", all = corpusOf(id), items = visibleCorpus();
   const xk = $("map-x").value, yk = $("map-y").value;
-  const W = 540, H = 470, L = 52, R = 16, T = 18, B = 44;
+  const W = 760, H = 470, L = 54, R = 18, T = 18, B = 44;
   const px = v => L + (v - 1) / 4 * (W - L - R);
   const py = v => H - B - (v - 1) / 4 * (H - T - B);
   const line = cssv("--line"), ink3 = cssv("--ink-3"), now = cssv("--now"), goal = cssv("--goal");
@@ -1742,15 +1749,15 @@ function drawMap(){
   const mx = Math.max(1, ...cells);
   for (let r = 0; r < 4; r++) for (let c = 0; c < 4; c++){
     const n = cells[r * 4 + c], x0 = px(1 + c), x1 = px(2 + c), y0 = py(2 + r), y1 = py(1 + r);
-    s += `<rect x="${x0}" y="${y0}" width="${x1 - x0}" height="${y1 - y0}" fill="${now}" fill-opacity="${(n / mx * .13).toFixed(3)}"/>`;
+    s += `<rect x="${x0}" y="${y0}" width="${x1 - x0}" height="${y1 - y0}" fill="${cssv("--ink")}" fill-opacity="${(n / mx * .07).toFixed(3)}"/>`;
     if (n === 0) s += `<text x="${(x0 + x1) / 2}" y="${(y0 + y1) / 2 + 4}" font-size="9.5" fill="${ink3}" text-anchor="middle" opacity=".65">空白</text>`;
   }
   // 目盛
   for (let v = 1; v <= 5; v++){
     s += `<line x1="${px(v)}" y1="${T}" x2="${px(v)}" y2="${H - B}" stroke="${line}" stroke-width=".5"/>`;
     s += `<line x1="${L}" y1="${py(v)}" x2="${W - R}" y2="${py(v)}" stroke="${line}" stroke-width=".5"/>`;
-    s += `<text x="${px(v)}" y="${H - B + 15}" font-size="10" fill="${ink3}" text-anchor="middle" font-family="var(--font-mono)">${v}</text>`;
-    s += `<text x="${L - 9}" y="${py(v) + 4}" font-size="10" fill="${ink3}" text-anchor="end" font-family="var(--font-mono)">${v}</text>`;
+    s += `<text x="${px(v)}" y="${H - B + 15}" font-size="10" fill="${ink3}" text-anchor="middle" font-family="monospace">${v}</text>`;
+    s += `<text x="${L - 9}" y="${py(v) + 4}" font-size="10" fill="${ink3}" text-anchor="end" font-family="monospace">${v}</text>`;
   }
   s += `<text x="${(L + W - R) / 2}" y="${H - 8}" font-size="11" fill="${ink3}" text-anchor="middle">${AX[xk].name} →</text>`;
   s += `<text x="14" y="${(T + H - B) / 2}" font-size="11" fill="${ink3}" text-anchor="middle" transform="rotate(-90 14 ${(T + H - B) / 2})">${AX[yk].name} →</text>`;
@@ -1762,6 +1769,7 @@ function drawMap(){
     if (!groups.has(key)) groups.set(key, []);
     groups.get(key).push(it);
   });
+  const pos = [];
   groups.forEach(list => {
     const cols = Math.ceil(Math.sqrt(list.length)), rows = Math.ceil(list.length / cols);
     list.forEach((it, i) => {
@@ -1769,18 +1777,20 @@ function drawMap(){
       const x = px(it.p[xk]) + (i % cols - (cols - 1) / 2) * step;
       const y = py(it.p[yk]) + (Math.floor(i / cols) - (rows - 1) / 2) * step;
       const col = CAT_COLORS[(it.ci || 0) % CAT_COLORS.length];
+      const n = pos.push({ it, x, y }) - 1;
       if (it.imgId){
-        s += `<g data-idx="${it.idx}" style="cursor:pointer">`
+        s += `<g data-i="${n}" data-idx="${it.idx}" style="cursor:pointer">`
           +  `<use href="#${it.imgId}" x="${(x-half).toFixed(1)}" y="${(y-half).toFixed(1)}"/>`
           +  `<rect x="${(x-half).toFixed(1)}" y="${(y-half).toFixed(1)}" width="20" height="20" fill="none" `
-          +  `stroke="${col}" stroke-width="1.8"><title>${it.name}／${it.cat}（クリックで現状に採用）</title></rect></g>`;
+          +  `stroke="${col}" stroke-width="1.8"/></g>`;
       } else {
-        s += `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="5.5" fill="${col}" `
+        s += `<circle data-i="${n}" cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="5.5" fill="${col}" `
           +  `fill-opacity="${it.src === "合成" ? .5 : .85}" stroke="${it.src === "合成" ? "none" : cssv("--ink")}" `
-          +  `stroke-width="1"><title>${it.name}（${it.src}）</title></circle>`;
+          +  `stroke-width="1"/>`;
       }
     });
   });
+  state.mapPos = pos;
   // 自社
   const nx = px(state.now[xk]), ny = py(state.now[yk]), gx = px(state.goal[xk]), gy = py(state.goal[yk]);
   if (nx !== gx || ny !== gy)
@@ -1791,9 +1801,11 @@ function drawMap(){
   s += `<circle cx="${nx}" cy="${ny}" r="11" fill="none" stroke="${now}" stroke-width="2.5"><title>現状</title></circle>`;
   s += `<rect x="${gx - 9}" y="${gy - 9}" width="18" height="18" fill="${paper}" opacity=".9"/>`;
   s += `<rect x="${gx - 7}" y="${gy - 7}" width="14" height="14" fill="${goal}"><title>目標</title></rect>`;
-  [[nx, ny, "現状", now], [gx, gy, "目標", goal]].forEach(([x, y, t, c]) => {
-    s += `<rect x="${x + 13}" y="${y - 8}" width="27" height="15" fill="${paper}" opacity=".85"/>`
-      +  `<text x="${x + 16}" y="${y + 4}" font-size="10.5" fill="${c}">${t}</text>`;
+  const same = nx === gx && ny === gy;
+  (same ? [[nx, ny, "現状＝目標", cssv("--ink-2"), 62]]
+        : [[nx, ny, "現状", now, 27], [gx, gy, "目標", goal, 27]]).forEach(([x, y, t, c, w2]) => {
+    s += `<rect x="${x + 13}" y="${y - 8}" width="${w2}" height="15" rx="3" fill="${paper}" opacity=".85"/>`
+      +  `<text x="${x + 16}" y="${y + 4}" font-size="10.5" fill="${c}" font-family="sans-serif">${t}</text>`;
   });
   s += `</g>`;
 
@@ -1802,13 +1814,20 @@ function drawMap(){
     svg.insertAdjacentHTML("afterbegin",
       `<defs>${CHAIRS.map(c => `<image id="ci-${c.id}" href="${c.src}" x="0" y="0" width="20" height="20" `
         + `preserveAspectRatio="xMidYMid slice"/>`).join("")}</defs><g id="map-layer"></g>`);
+    svg.insertAdjacentHTML("beforeend", `<g id="map-hover" pointer-events="none"></g>`);
     svg.dataset.ready = "1";
     svg.addEventListener("click", e => {
       const g2 = e.target.closest("[data-idx]");
       if (g2) useChair(+g2.dataset.idx);
     });
+    svg.addEventListener("mousemove", e => {
+      const t = e.target.closest("[data-i]");
+      mapPreview(t ? +t.dataset.i : null);
+    });
+    svg.addEventListener("mouseleave", () => mapPreview(null));
   }
   svg.querySelector("#map-layer").innerHTML = s;
+  mapPreview(null);
 
   // 凡例
   const cats = catsOf(id);
@@ -1831,6 +1850,37 @@ function drawMap(){
       + "収集そのもの（Amazon・画像検索）は外側のパイプラインの仕事で、ここは受け皿。「画像から追加」で同じ座標系に足せます。"
     : "Amazonや画像検索からの収集は外側のパイプラインで行い、ここは受け皿。この対象の初期値は各カテゴリの代表プロファイルから生成した合成コーパスで、"
       + "「画像から追加」で集めた画像を放り込むと自動推定で同じ座標系に乗ります。";
+}
+
+/* ホバー中の一点を大きく見せる（Notion のプレビュー相当） */
+function mapPreview(i){
+  const layer = $("map") && $("map").querySelector("#map-hover");
+  if (!layer) return;
+  if (i == null || !state.mapPos || !state.mapPos[i]){ layer.innerHTML = ""; state.mapHover = null; return; }
+  if (state.mapHover === i) return;
+  state.mapHover = i;
+  const { it, x, y } = state.mapPos[i];
+  const W = 760, H = 470, paper = cssv("--paper"), line = cssv("--line");
+  const col = CAT_COLORS[(it.ci || 0) % CAT_COLORS.length];
+  const img = it.imgId ? (CHAIRS.find(c => `ci-${c.id}` === it.imgId) || {}).src : null;
+  const w = img ? 168 : 172, side = w - 16, h = (img ? side + 12 : 6) + 44;
+  let bx = x + 18; if (bx + w > W - 6) bx = x - 18 - w;
+  let by = Math.max(6, Math.min(H - h - 6, y - h / 2));
+
+  let g = `<rect x="${bx + 2}" y="${by + 3}" width="${w}" height="${h}" rx="7" fill="rgba(15,15,15,.10)"/>`
+        + `<rect x="${bx}" y="${by}" width="${w}" height="${h}" rx="7" fill="${paper}" stroke="${line}"/>`;
+  if (img) g += `<image href="${img}" x="${bx + 8}" y="${by + 8}" width="${side}" height="${side}" `
+              + `preserveAspectRatio="xMidYMid meet"/>`;
+  const ty = by + (img ? side + 12 : 6) + 18;
+  g += `<text x="${bx + 11}" y="${ty}" font-size="12" font-family="sans-serif" fill="${cssv("--ink")}">${it.name}</text>`
+    +  `<circle cx="${bx + 15}" cy="${ty + 15}" r="4" fill="${col}"/>`
+    +  `<text x="${bx + 25}" y="${ty + 19}" font-size="11" font-family="sans-serif" fill="${cssv("--ink-3")}">${it.cat}`
+    +  `${it.imgId ? "（クリックで現状に採用）" : ""}</text>`;
+  // 元の点も強調
+  g += it.imgId
+    ? `<rect x="${x - 12}" y="${y - 12}" width="24" height="24" rx="3" fill="none" stroke="${col}" stroke-width="2.5"/>`
+    : `<circle cx="${x}" cy="${y}" r="8.5" fill="none" stroke="${col}" stroke-width="2"/>`;
+  layer.innerHTML = g;
 }
 
 function drawCatTable(){
@@ -1888,7 +1938,7 @@ function adviceList(){
     const room = (5 - cur) / 4;
     const banned = !!(ctx.taboo || {})[k];
     const score = banned ? 0 : imp * (.35 + .65 * space) * room;
-    const step = Math.max(0, Math.min(5 - cur, Math.round(score * 5)));
+    const step = Math.max(0, Math.min(5 - cur, snap(1 + score * 5) - 1));
     return { a, key:k, imp, space, room, score, step, banned, known, rated:rated.length,
              reason:(ctx.taboo || {})[k] || "" };
   }).sort((x, y) => y.score - x.score);
@@ -1904,7 +1954,7 @@ function drawAdvice(){
       <div class="card-top">
         <span class="rank">${i + 1}</span>
         <strong>${r.a.name}</strong>
-        <span class="move">${state.now[r.key]} → ${state.now[r.key] + r.step}</span>
+        <span class="move">${fmt(state.now[r.key])} → ${fmt(state.now[r.key] + r.step)}</span>
         <button class="btn mini" data-adopt="${r.key}">目標に採用</button>
       </div>
       <p>${r.step > 0 ? (r.a.bUp || r.a.up) : "現状維持"}</p>
@@ -1939,7 +1989,7 @@ function drawAdvice(){
   L.push(`市場：${items.length}件。最も混んでいるのは「${crowd ? crowd[0] : "─"}」（${crowd ? crowd[1] : 0}件）。`);
   L.push("");
   L.push("【伸ばす】");
-  top.forEach((r, i) => L.push(`${i + 1}. ${r.a.name}　${state.now[r.key]}→${state.now[r.key] + r.step}　${r.a.bUp || r.a.up}`));
+  top.forEach((r, i) => L.push(`${i + 1}. ${r.a.name}　${fmt(state.now[r.key])}→${fmt(state.now[r.key] + r.step)}　${r.a.bUp || r.a.up}`));
   if (bans.length){
     L.push("");
     L.push("【上げない】");
@@ -2144,7 +2194,7 @@ function render3D(){
   const modern = (P.image - 3) / 2, surp = (P.surp - 3) / 2;
 
   // 背景と床
-  const bgTop = atmos > 0 ? "#EFE6D6" : "#D5D8DA", bgBot = atmos > 0 ? "#C9B79C" : "#9DA5A9";
+  const bgTop = atmos > 0 ? "#FAF6EF" : "#F4F5F6", bgBot = atmos > 0 ? "#DCD0BC" : "#C9CDD1";
   const bg = g.createLinearGradient(0, 0, 0, H);
   bg.addColorStop(0, bgTop); bg.addColorStop(1, bgBot);
   g.fillStyle = bg; g.fillRect(0, 0, W, H);
@@ -2225,9 +2275,9 @@ function render3D(){
     `<span><i style="background:${(faces.find(fc => fc.role === r) || {}).color}"></i>${roles[r] || r}</span>`).join("");
   $("three-badge").textContent = `${(PRESETS.find(p => p.id === id) || {}).name || "対象"}／面 ${faces.length}`;
   $("readout3d").innerHTML =
-    `<span>フィット性 ${P.fit} → 接触面の皿</span><span>形態 ${P.form} → 装飾${P.form <= 3 ? "有" : "無"}／面 ${faces.length}</span>`
-    + `<span>新しい組み合わせ ${P.combi} → ${matName(id, P.combi)}</span>`
-    + `<span>機能性 ${P.func} → 操作部 ×${(1 + (P.func-1)/4*.5).toFixed(2)}</span>`;
+    `<span>フィット性 ${fmt(P.fit)} → 接触面の皿</span><span>形態 ${fmt(P.form)} → 装飾${P.form <= 3 ? "有" : "無"}／面 ${faces.length}</span>`
+    + `<span>新しい組み合わせ ${fmt(P.combi)} → ${matName(id, P.combi)}</span>`
+    + `<span>機能性 ${fmt(P.func)} → 操作部 ×${(1 + (P.func-1)/4*.5).toFixed(2)}</span>`;
 }
 
 /* ============================================================
@@ -2300,6 +2350,7 @@ function setTab(t){
   state.tab = t;
   document.querySelectorAll(".tab").forEach(b => b.setAttribute("aria-selected", b.dataset.tab === t));
   ["research", "concept", "visual", "eval"].forEach(k => $("pane-" + k).classList.toggle("on", k === t));
+  document.querySelector(".deck").classList.toggle("no-rail", t === "research");
   drawAll();
 }
 function setVis(m){
@@ -2444,7 +2495,7 @@ $("btn-save-cand").addEventListener("click", () => {
   state.cands.push({
     title: `${p ? p.name : "案"} ${state.cands.length + 1}`,
     summary: moved.length
-      ? moved.map(a => `${a.name}${d[a.key] > 0 ? "+" : "−"}${Math.abs(d[a.key])}`).join(" ")
+      ? moved.map(a => `${a.name}${fmtd(d[a.key])}`).join(" ")
       : "差分なし",
     preset: state.preset, now:{ ...state.now }, goal:{ ...state.goal }
   });
