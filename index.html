@@ -61,6 +61,9 @@ button{cursor:pointer}
 .btn.primary{background:var(--now); border-color:transparent; color:#fff}
 .btn.primary:hover{filter:brightness(1.07); background:var(--now)}
 .btn.mini{padding:3px 9px; font-size:12.5px}
+.btn:disabled{opacity:.38; cursor:default}
+.btn:disabled:hover{background:var(--surface)}
+.btn.primary:disabled:hover{background:var(--now)}
 
 /* ── 工程タブ ── */
 .tabbar{
@@ -408,6 +411,10 @@ svg text{font-family:var(--font-ui)}
       </div>
       <svg id="cmap" viewBox="0 0 680 430" role="img" aria-label="狙う領域の指定"></svg>
       <p class="hint" id="c-region"></p>
+      <div class="row">
+        <button class="btn primary" id="c-visualize" disabled>この領域で可視化する</button>
+        <span class="cap" id="c-visualize-note"></span>
+      </div>
       <div class="block" style="margin:0">
         <h3>伸ばす項目</h3>
         <p class="hint" style="margin-bottom:10px">用途文脈での重要度 × 市場の空き × 伸びしろ の積で並べています。</p>
@@ -2408,6 +2415,13 @@ function drawConceptMap(){
   } else {
     note.textContent = "セルをクリックすると、その領域が目標になります。数字はその領域にいる競合の数で、色が濃いほど混んでいます。";
   }
+  const btn = $("c-visualize");
+  if (btn){
+    btn.disabled = !sel;
+    $("c-visualize-note").textContent = sel
+      ? `${AX[sel.xk].name} ${fmt(sel.cx)}／${AX[sel.yk].name} ${fmt(sel.cy)} を目標にして形を見ます`
+      : "領域を選ぶと押せます";
+  }
 }
 
 function pickRegion(i, j){
@@ -2854,7 +2868,7 @@ function setTab(t){
   state.tab = t;
   document.querySelectorAll(".tab").forEach(b => b.setAttribute("aria-selected", b.dataset.tab === t));
   ["research", "concept", "visual", "eval"].forEach(k => $("pane-" + k).classList.toggle("on", k === t));
-  document.querySelector(".deck").classList.toggle("no-rail", t === "research");
+  document.querySelector(".deck").classList.toggle("no-rail", t === "research" || t === "concept");
   drawAll();
 }
 function setVis(m){
@@ -2963,6 +2977,7 @@ $("btn-corpus-json").addEventListener("click", () => {
 
 ["c-x", "c-y", "c-grid"].forEach(id => $(id).addEventListener("change", () => { state.region = null; drawAll(); }));
 $("c-clear").addEventListener("click", () => { state.region = null; drawAll(); });
+$("c-visualize").addEventListener("click", () => { setVis("3d"); setTab("visual"); });
 $("btn-adopt-all").addEventListener("click", () => {
   (state.advice || []).filter(r => !r.banned && r.step > 0).slice(0, 3)
     .forEach(r => state.goal[r.key] = Math.min(5, state.now[r.key] + r.step));
