@@ -10,8 +10,8 @@
   --paper:#FFFFFF; --surface:#FFFFFF; --sub:#FFFFFF; --sunk:#F7F7F5;
   --line:rgba(55,53,47,.16); --line-soft:rgba(55,53,47,.09);
   --hover:rgba(55,53,47,.06);
-  --ink:#37352F; --ink-2:#5F5C56; --ink-3:#9B9A97;
-  --now:#2383E2; --goal:#D9730D;
+  --ink:#1F1E1B; --ink-2:#332F28; --ink-3:#55524C;
+  --now:#2383E2; --goal:#D9730D; --mkt:#D93025;
   --pos:#0F7B6C; --neg:#E03E3E;
   --tint-now:rgba(35,131,226,.12); --tint-goal:rgba(217,115,13,.12);
   --tint-warn:rgba(224,62,62,.09);
@@ -24,8 +24,8 @@
   --paper:#FFFFFF; --surface:#FFFFFF; --sub:#FFFFFF; --sunk:#F7F7F5;
   --line:rgba(55,53,47,.16); --line-soft:rgba(55,53,47,.09);
   --hover:rgba(55,53,47,.06);
-  --ink:#37352F; --ink-2:#5F5C56; --ink-3:#9B9A97;
-  --now:#2383E2; --goal:#D9730D;
+  --ink:#1F1E1B; --ink-2:#332F28; --ink-3:#55524C;
+  --now:#2383E2; --goal:#D9730D; --mkt:#D93025;
   --pos:#0F7B6C; --neg:#E03E3E;
   --tint-now:rgba(35,131,226,.12); --tint-goal:rgba(217,115,13,.12);
   --tint-warn:rgba(224,62,62,.09);
@@ -33,6 +33,10 @@
 }
 *{box-sizing:border-box}
 [hidden]{display:none !important}
+/* Google Material Symbols（Apache-2.0）のアウトラインをSVGで内蔵 */
+.ic{width:16px; height:16px; flex:0 0 auto; fill:currentColor; opacity:.9}
+h2 .ic,h3 .ic{width:15px; height:15px; opacity:.55}
+.ic-lg{width:18px; height:18px}
 html,body{height:100%}
 body{
   margin:0; background:var(--paper); color:var(--ink);
@@ -53,6 +57,7 @@ button{cursor:pointer}
 .masthead .spacer{flex:1 1 auto}
 .tools{display:flex; gap:6px; align-items:center; flex-wrap:wrap}
 .btn{
+  display:inline-flex; align-items:center; gap:5px; white-space:nowrap;
   border:1px solid var(--line); background:var(--surface); color:var(--ink);
   padding:4px 11px; border-radius:4px; font-size:13px; font-weight:500;
   transition:background .12s, border-color .12s;
@@ -71,6 +76,7 @@ button{cursor:pointer}
   padding:0 14px; background:var(--surface); border-bottom:1px solid var(--line-soft);
 }
 .tab{
+  display:inline-flex; align-items:center; gap:6px; white-space:nowrap;
   border:0; background:transparent; color:var(--ink-2);
   padding:9px 10px 8px; margin-bottom:-1px; font-size:13.5px; font-weight:500;
   border-bottom:2px solid transparent; border-radius:4px 4px 0 0;
@@ -98,10 +104,10 @@ button{cursor:pointer}
 .deck.no-rail .panel.ledger{display:none}
 .panel.ledger{background:var(--sub); border-right:1px solid var(--line)}
 .panel-head{
-  display:flex; align-items:center; gap:10px; justify-content:space-between;
+  display:flex; align-items:center; gap:10px; justify-content:space-between; flex-wrap:wrap;
   padding:14px 18px 8px;
 }
-.panel-head h2{margin:0; font-size:15px; font-weight:600}
+.panel-head h2{margin:0; font-size:15px; font-weight:600; display:flex; align-items:center; gap:7px; white-space:nowrap}
 .panel-head .cap{font-size:12px; color:var(--ink-3)}
 .panel-body{padding:6px 18px 24px; overflow:auto; flex:1 1 auto}
 .pane{display:none; flex-direction:column; min-height:0; flex:1 1 auto}
@@ -111,6 +117,7 @@ button{cursor:pointer}
 /* ── 切替（セグメント） ── */
 .modeswitch{display:flex; gap:2px; background:var(--sunk); padding:2px; border-radius:6px}
 .modeswitch button{
+  display:inline-flex; align-items:center; gap:5px; white-space:nowrap;
   border:0; background:transparent; padding:3px 10px; border-radius:4px;
   font-size:12.5px; color:var(--ink-2); transition:background .12s, color .12s;
 }
@@ -206,12 +213,18 @@ button{cursor:pointer}
 .parts i{width:10px; height:10px; border-radius:3px}
 
 /* ── 調査 ── */
-.mapbar{display:flex; gap:10px; align-items:center; flex-wrap:wrap; font-size:12.5px; color:var(--ink-3)}
+.mapbar{display:flex; gap:10px; align-items:center; flex-wrap:wrap; font-size:12.5px; color:var(--ink-2)}
+.mapbar label{display:inline-flex; align-items:center; gap:5px}
+.mapbar input[type=range]{width:96px; accent-color:var(--now)}
+.keyfield{flex:1 1 260px; min-width:200px; background:var(--surface); border:1px solid var(--line);
+  border-radius:4px; padding:4px 9px; font-size:12.5px; font-family:var(--font-mono)}
+.keyfield:focus{border-color:var(--now); outline:none}
+#ai-model{background:var(--surface); border:1px solid var(--line); border-radius:4px; padding:3px 7px; font-size:12.5px}
 .mapbar select{
   background:var(--surface); border:1px solid var(--line); border-radius:4px;
   padding:3px 7px; font-size:13px; color:var(--ink);
 }
-.spread{display:flex; flex-wrap:wrap; gap:4px 14px; align-items:center; font-size:11px; color:var(--ink-3)}
+.spread{display:flex; flex-wrap:wrap; gap:4px 14px; align-items:center; font-size:11px; color:var(--ink-2)}
 .spread .lab{font-weight:600; color:var(--ink-2)}
 .spread .sp{display:flex; align-items:center; gap:5px; font-variant-numeric:tabular-nums}
 .spread .sp u{display:inline-block; width:34px; height:4px; border-radius:2px; background:var(--line-soft);
@@ -293,9 +306,9 @@ svg text{font-family:var(--font-ui)}
 .legend .n i{color:var(--now)} .legend .g i{color:var(--goal)}
 .evalgrid{display:grid; grid-template-columns:300px minmax(0,1fr); gap:26px; align-items:start}
 .checks{list-style:none; margin:0; padding:0; font-size:13px}
-.checks li{display:flex; gap:9px; padding:6px 0; align-items:baseline; border-bottom:1px solid var(--line-soft)}
+.checks li{display:flex; gap:9px; padding:6px 0; align-items:flex-start; border-bottom:1px solid var(--line-soft)}
 .checks li:last-child{border-bottom:0}
-.checks .mk{font-family:var(--font-mono); font-size:12.5px; width:14px; flex:0 0 auto}
+.checks .mk{display:flex; width:16px; flex:0 0 auto; padding-top:3px}
 .checks .ok .mk{color:var(--pos)} .checks .warn .mk{color:var(--goal)} .checks .ng .mk{color:var(--neg)}
 .saved{list-style:none; margin:0; padding:0; font-size:13px}
 .saved li{display:flex; gap:9px; align-items:center; padding:5px 7px; border-radius:4px}
@@ -326,17 +339,17 @@ svg text{font-family:var(--font-ui)}
   <span class="spacer"></span>
   <div class="tools">
     <input type="file" id="file" accept="image/*" hidden>
-    <button class="btn" id="btn-open">画像を読み込む</button>
-    <button class="btn" id="btn-reset">目標を現状に戻す</button>
-    <button class="btn primary" id="btn-save">改変案をPNG保存</button>
+    <button class="btn" id="btn-open" data-ic="image">画像を読み込む</button>
+    <button class="btn" id="btn-reset" data-ic="restart_alt">目標を現状に戻す</button>
+    <button class="btn primary" id="btn-save" data-ic="download">改変案をPNG保存</button>
   </div>
 </header>
 
 <nav class="tabbar" role="tablist" aria-label="工程">
-  <button class="tab" role="tab" data-tab="research" aria-selected="true">① 調査</button>
-  <button class="tab" role="tab" data-tab="concept" aria-selected="false">② コンセプト</button>
-  <button class="tab" role="tab" data-tab="visual" aria-selected="false">③ 可視化</button>
-  <button class="tab" role="tab" data-tab="eval" aria-selected="false">④ 評価</button>
+  <button class="tab" role="tab" data-tab="research" aria-selected="true" data-ic="search">① 調査</button>
+  <button class="tab" role="tab" data-tab="concept" aria-selected="false" data-ic="lightbulb">② コンセプト</button>
+  <button class="tab" role="tab" data-tab="visual" aria-selected="false" data-ic="view_in_ar">③ 可視化</button>
+  <button class="tab" role="tab" data-tab="eval" aria-selected="false" data-ic="fact_check">④ 評価</button>
   <div class="presets" id="presets" role="group" aria-label="対象"></div>
 </nav>
 
@@ -345,10 +358,10 @@ svg text{font-family:var(--font-ui)}
   <!-- ① 評価台帳 -->
   <section class="panel ledger">
     <div class="panel-head">
-      <h2>評価台帳</h2>
+      <h2 data-ic="straighten">評価台帳</h2>
       <div class="modeswitch" role="group" aria-label="編集対象">
-        <button id="mode-now" aria-pressed="false">現状を評価</button>
-        <button id="mode-goal" aria-pressed="true">目標を決める</button>
+        <button id="mode-now" aria-pressed="false" data-ic="visibility">現状を評価</button>
+        <button id="mode-goal" aria-pressed="true" data-ic="edit_note">目標を決める</button>
       </div>
     </div>
     <div class="panel-body">
@@ -363,7 +376,7 @@ svg text{font-family:var(--font-ui)}
   <!-- ① 調査 -->
   <div class="pane" id="pane-research" role="tabpanel" aria-label="調査">
     <div class="panel-head">
-      <h2>市場マップ</h2>
+      <h2 data-ic="search">市場マップ</h2>
       <span class="cap" id="corpus-cap">─</span>
     </div>
     <div class="pane-body">
@@ -372,13 +385,16 @@ svg text{font-family:var(--font-ui)}
         <label>横軸 <select id="map-x"></select></label>
         <label>縦軸 <select id="map-y"></select></label>
         <label>奥行き <select id="map-z"></select></label>
+        <label data-ic="photo_size_select_large">サンプルの大きさ
+          <input type="range" id="map-size" min="10" max="72" step="2" value="20" aria-label="サンプル画像の大きさ">
+          <span class="cap" id="map-size-val">20px</span></label>
         <span class="spacer" style="flex:1 1 auto"></span>
-        <button class="btn mini" id="map-zoom-out" aria-label="縮小">−</button>
-        <button class="btn mini" id="map-zoom-in" aria-label="拡大">＋</button>
-        <button class="btn mini" id="map-reset">表示をリセット</button>
+        <button class="btn mini" id="map-zoom-out" aria-label="縮小" data-ic="zoom_out"></button>
+        <button class="btn mini" id="map-zoom-in" aria-label="拡大" data-ic="zoom_in"></button>
+        <button class="btn mini" id="map-reset" data-ic="refresh">表示をリセット</button>
         <input type="file" id="corpus-file" accept="image/*" multiple hidden>
-        <button class="btn mini" id="btn-corpus-img">画像から追加</button>
-        <button class="btn mini" id="btn-corpus-json">コーパスを保存</button>
+        <button class="btn mini" id="btn-corpus-img" data-ic="add_photo_alternate">画像から追加</button>
+        <button class="btn mini" id="btn-corpus-json" data-ic="save">コーパスを保存</button>
       </div>
       <div class="spread" id="spread"></div>
       <div class="maprow">
@@ -386,7 +402,7 @@ svg text{font-family:var(--font-ui)}
         <div class="maplegend" id="map-legend"></div>
       </div>
       <div class="block">
-        <h3>カテゴリ別プロファイル</h3>
+        <h3 data-ic="palette">カテゴリ別プロファイル</h3>
         <div class="cattable" id="cattable"></div>
       </div>
     </div>
@@ -395,7 +411,7 @@ svg text{font-family:var(--font-ui)}
   <!-- ② コンセプト -->
   <div class="pane" id="pane-concept" role="tabpanel" aria-label="コンセプト">
     <div class="panel-head">
-      <h2>伸ばす項目の助言</h2>
+      <h2 data-ic="lightbulb">伸ばす項目の助言</h2>
       <span class="cap" id="concept-cap">─</span>
     </div>
     <div class="pane-body">
@@ -407,25 +423,25 @@ svg text{font-family:var(--font-ui)}
           <option value="4" selected>4×4</option><option value="5">5×5</option>
           <option value="6">6×6</option></select></label>
         <span class="spacer" style="flex:1 1 auto"></span>
-        <button class="btn mini" id="c-clear">領域の指定を外す</button>
+        <button class="btn mini" id="c-clear" data-ic="close">領域の指定を外す</button>
       </div>
       <svg id="cmap" viewBox="0 0 680 430" role="img" aria-label="狙う領域の指定"></svg>
       <p class="hint" id="c-region"></p>
       <div class="row">
-        <button class="btn primary" id="c-visualize" disabled>この領域で可視化する</button>
+        <button class="btn primary" id="c-visualize" disabled data-ic="view_in_ar">この領域で可視化する</button>
         <span class="cap" id="c-visualize-note"></span>
       </div>
       <div class="block" style="margin:0">
-        <h3>伸ばす項目</h3>
+        <h3 data-ic="lightbulb">伸ばす項目</h3>
         <p class="hint" style="margin-bottom:10px">用途文脈での重要度 × 市場の空き × 伸びしろ の積で並べています。</p>
         <div class="advice" id="advice"></div>
       </div>
       <div class="block">
-        <h3>コンセプト文</h3>
+        <h3 data-ic="edit_note">コンセプト文</h3>
         <textarea class="brief" id="concept-text" spellcheck="false" aria-label="コンセプト文" style="min-height:130px"></textarea>
         <div class="row" style="margin-top:8px">
-          <button class="btn mini" id="btn-adopt-all">上位3項目をまとめて目標に採用</button>
-          <button class="btn mini" id="btn-copy-concept">コンセプト文をコピー</button>
+          <button class="btn mini" id="btn-adopt-all" data-ic="check_circle">上位3項目をまとめて目標に採用</button>
+          <button class="btn mini" id="btn-copy-concept" data-ic="content_copy">コンセプト文をコピー</button>
         </div>
       </div>
     </div>
@@ -434,10 +450,10 @@ svg text{font-family:var(--font-ui)}
   <!-- ③ 可視化 -->
   <div class="pane" id="pane-visual" role="tabpanel" aria-label="可視化">
     <div class="panel-head">
-      <h2>可視化</h2>
+      <h2 data-ic="view_in_ar">可視化</h2>
       <div class="modeswitch" role="group" aria-label="表示">
-        <button id="vis-3d" aria-pressed="true">3D形状</button>
-        <button id="vis-img" aria-pressed="false">画像改変</button>
+        <button id="vis-3d" aria-pressed="true" data-ic="view_in_ar">3D形状</button>
+        <button id="vis-img" aria-pressed="false" data-ic="image">画像改変</button>
       </div>
     </div>
 
@@ -469,7 +485,7 @@ svg text{font-family:var(--font-ui)}
       </label>
       <div>
         <div class="panel-head" style="padding:0 0 6px; border:0">
-          <h2 style="font-size:12px">派生案</h2>
+          <h2 style="font-size:12px" data-ic="grid_on">派生案</h2>
           <span class="cap">目標プロファイルを揺らした8案／選ぶと目標に採用</span>
         </div>
         <div class="variants" id="variants"></div>
@@ -481,7 +497,7 @@ svg text{font-family:var(--font-ui)}
   <!-- ④ 評価 -->
   <div class="pane" id="pane-eval" role="tabpanel" aria-label="評価">
     <div class="panel-head">
-      <h2>差分と評価</h2>
+      <h2 data-ic="fact_check">差分と評価</h2>
       <span class="cap">現状 → 目標</span>
     </div>
     <div class="pane-body">
@@ -493,29 +509,48 @@ svg text{font-family:var(--font-ui)}
           <span class="g"><i></i>目標</span>
         </div>
         <div class="block">
-          <h3>妥当性チェック</h3>
+          <h3 data-ic="fact_check">妥当性チェック</h3>
           <ul class="checks" id="checks"></ul>
         </div>
       </div>
       <div>
       <div class="block">
-        <h3>画像処理レシピ</h3>
+        <h3 data-ic="tune">画像処理レシピ</h3>
         <ul class="recipe" id="recipe"></ul>
       </div>
 
       <div class="block">
-        <h3>設計指示書（構造項目を含む）</h3>
+        <h3 data-ic="edit_note">設計指示書（構造項目を含む）</h3>
         <textarea class="brief" id="brief" spellcheck="false" aria-label="設計指示書"></textarea>
         <div class="row" style="margin-top:8px">
-          <button class="btn mini" id="btn-copy">指示書をコピー</button>
-          <button class="btn mini" id="btn-json">レシピをJSONで保存</button>
+          <button class="btn mini" id="btn-copy" data-ic="content_copy">指示書をコピー</button>
+          <button class="btn mini" id="btn-json" data-ic="data_object">レシピをJSONで保存</button>
         </div>
       </div>
 
       <div class="block">
-        <h3>案の記録</h3>
+        <h3 data-ic="auto_awesome">AI講評（Claude）</h3>
+        <p class="hint">いまの可視化と9項目の差分をClaudeに送り、用途文脈から見た妥当性を講評してもらいます。
+          APIキーは<strong>この画面で入力し、ブラウザのlocalStorageにだけ保存</strong>します。コードにもリポジトリにも書き込みません。
+          公開ページは外部通信が遮断されているため、<strong>ローカルで index.html を開いたときだけ</strong>動きます。</p>
+        <div class="row" style="margin-bottom:8px">
+          <input type="password" id="ai-key" class="keyfield" placeholder="sk-ant-… （自分のAPIキー）" autocomplete="off" spellcheck="false">
+          <select id="ai-model" aria-label="モデル">
+            <option value="claude-opus-5">Opus 5</option>
+            <option value="claude-sonnet-5">Sonnet 5</option>
+            <option value="claude-haiku-4-5">Haiku 4.5</option>
+          </select>
+          <button class="btn primary mini" id="ai-run" data-ic="auto_awesome">いまの案を講評してもらう</button>
+          <button class="btn mini" id="ai-clear" data-ic="delete">キーを消す</button>
+        </div>
+        <textarea class="brief" id="ai-out" readonly spellcheck="false" aria-label="AI講評"
+          placeholder="ここに講評が出ます。"></textarea>
+      </div>
+
+      <div class="block">
+        <h3 data-ic="bookmark_add">案の記録</h3>
         <div class="row" style="margin-bottom:6px">
-          <button class="btn mini" id="btn-save-cand">いまの案を記録する</button>
+          <button class="btn mini" id="btn-save-cand" data-ic="bookmark_add">いまの案を記録する</button>
         </div>
         <ul class="saved" id="saved"></ul>
       </div>
@@ -530,6 +565,57 @@ svg text{font-family:var(--font-ui)}
 <script src="samples/chairs.js"></script>
 <script>
 "use strict";
+
+/* ── アイコン（Google Material Symbols / Apache-2.0 のアウトラインを内蔵） ──
+   外部読み込みはしない。data-ic="名前" を付けた要素の先頭に差し込む。 */
+const ICONS = {
+  search:"M784-120 532-372q-30 24-69 38t-83 14q-109 0-184.5-75.5T120-580q0-109 75.5-184.5T380-840q109 0 184.5 75.5T640-580q0 44-14 83t-38 69l252 252-56 56ZM380-400q75 0 127.5-52.5T560-580q0-75-52.5-127.5T380-760q-75 0-127.5 52.5T200-580q0 75 52.5 127.5T380-400Z",
+  lightbulb:"M423.5-103.5Q400-127 400-160h160q0 33-23.5 56.5T480-80q-33 0-56.5-23.5ZM320-200v-80h320v80H320Zm10-120q-69-41-109.5-110T180-580q0-125 87.5-212.5T480-880q125 0 212.5 87.5T780-580q0 81-40.5 150T630-320H330Zm24-80h252q45-32 69.5-79T700-580q0-92-64-156t-156-64q-92 0-156 64t-64 156q0 54 24.5 101t69.5 79Zm126 0Z",
+  view_in_ar:"M440-181 240-296q-19-11-29.5-29T200-365v-230q0-22 10.5-40t29.5-29l200-115q19-11 40-11t40 11l200 115q19 11 29.5 29t10.5 40v230q0 22-10.5 40T720-296L520-181q-19 11-40 11t-40-11Zm0-92v-184l-160-93v185l160 92Zm80 0 160-92v-185l-160 93v184ZM80-680v-120q0-33 23.5-56.5T160-880h120v80H160v120H80ZM280-80H160q-33 0-56.5-23.5T80-160v-120h80v120h120v80Zm400 0v-80h120v-120h80v120q0 33-23.5 56.5T800-80H680Zm120-600v-120H680v-80h120q33 0 56.5 23.5T880-800v120h-80ZM480-526l158-93-158-91-158 91 158 93Zm0 45Zm0-45Zm40 69Zm-80 0Z",
+  fact_check:"M160-120q-33 0-56.5-23.5T80-200v-560q0-33 23.5-56.5T160-840h640q33 0 56.5 23.5T880-760v560q0 33-23.5 56.5T800-120H160Zm0-80h640v-560H160v560Zm40-80h200v-80H200v80Zm382-80 198-198-57-57-141 142-57-57-56 57 113 113Zm-382-80h200v-80H200v80Zm0-160h200v-80H200v80Zm-40 400v-560 560Z",
+  image:"M200-120q-33 0-56.5-23.5T120-200v-560q0-33 23.5-56.5T200-840h560q33 0 56.5 23.5T840-760v560q0 33-23.5 56.5T760-120H200Zm0-80h560v-560H200v560Zm40-80h480L570-480 450-320l-90-120-120 160Zm-40 80v-560 560Z",
+  restart_alt:"M440-122q-121-15-200.5-105.5T160-440q0-66 26-126.5T260-672l57 57q-38 34-57.5 79T240-440q0 88 56 155.5T440-202v80Zm80 0v-80q87-16 143.5-83T720-440q0-100-70-170t-170-70h-3l44 44-56 56-140-140 140-140 56 56-44 44h3q134 0 227 93t93 227q0 121-79.5 211.5T520-122Z",
+  download:"M480-320 280-520l56-58 104 104v-326h80v326l104-104 56 58-200 200ZM240-160q-33 0-56.5-23.5T160-240v-120h80v120h480v-120h80v120q0 33-23.5 56.5T720-160H240Z",
+  zoom_in:"M784-120 532-372q-30 24-69 38t-83 14q-109 0-184.5-75.5T120-580q0-109 75.5-184.5T380-840q109 0 184.5 75.5T640-580q0 44-14 83t-38 69l252 252-56 56ZM380-400q75 0 127.5-52.5T560-580q0-75-52.5-127.5T380-760q-75 0-127.5 52.5T200-580q0 75 52.5 127.5T380-400Zm-40-60v-80h-80v-80h80v-80h80v80h80v80h-80v80h-80Z",
+  zoom_out:"M784-120 532-372q-30 24-69 38t-83 14q-109 0-184.5-75.5T120-580q0-109 75.5-184.5T380-840q109 0 184.5 75.5T640-580q0 44-14 83t-38 69l252 252-56 56ZM380-400q75 0 127.5-52.5T560-580q0-75-52.5-127.5T380-760q-75 0-127.5 52.5T200-580q0 75 52.5 127.5T380-400ZM280-540v-80h200v80H280Z",
+  refresh:"M480-160q-134 0-227-93t-93-227q0-134 93-227t227-93q69 0 132 28.5T720-690v-110h80v280H520v-80h168q-32-56-87.5-88T480-720q-100 0-170 70t-70 170q0 100 70 170t170 70q77 0 139-44t87-116h84q-28 106-114 173t-196 67Z",
+  add_photo_alternate:"M480-480ZM200-120q-33 0-56.5-23.5T120-200v-560q0-33 23.5-56.5T200-840h320v80H200v560h560v-320h80v320q0 33-23.5 56.5T760-120H200Zm40-160h480L570-480 450-320l-90-120-120 160Zm440-320v-80h-80v-80h80v-80h80v80h80v80h-80v80h-80Z",
+  save:"M840-680v480q0 33-23.5 56.5T760-120H200q-33 0-56.5-23.5T120-200v-560q0-33 23.5-56.5T200-840h480l160 160Zm-80 34L646-760H200v560h560v-446ZM565-275q35-35 35-85t-35-85q-35-35-85-35t-85 35q-35 35-35 85t35 85q35 35 85 35t85-35ZM240-560h360v-160H240v160Zm-40-86v446-560 114Z",
+  close:"m256-200-56-56 224-224-224-224 56-56 224 224 224-224 56 56-224 224 224 224-56 56-224-224-224 224Z",
+  auto_awesome:"m760-600-50-110-110-50 110-50 50-110 50 110 110 50-110 50-50 110Zm0 560-50-110-110-50 110-50 50-110 50 110 110 50-110 50-50 110ZM360-160 260-380 40-480l220-100 100-220 100 220 220 100-220 100-100 220Zm0-194 40-86 86-40-86-40-40-86-40 86-86 40 86 40 40 86Zm0-126Z",
+  delete:"M280-120q-33 0-56.5-23.5T200-200v-520h-40v-80h200v-40h240v40h200v80h-40v520q0 33-23.5 56.5T680-120H280Zm400-600H280v520h400v-520ZM360-280h80v-360h-80v360Zm160 0h80v-360h-80v360ZM280-720v520-520Z",
+  content_copy:"M360-240q-33 0-56.5-23.5T280-320v-480q0-33 23.5-56.5T360-880h360q33 0 56.5 23.5T800-800v480q0 33-23.5 56.5T720-240H360Zm0-80h360v-480H360v480ZM200-80q-33 0-56.5-23.5T120-160v-560h80v560h440v80H200Zm160-240v-480 480Z",
+  data_object:"M560-160v-80h120q17 0 28.5-11.5T720-280v-80q0-38 22-69t58-44v-14q-36-13-58-44t-22-69v-80q0-17-11.5-28.5T680-720H560v-80h120q50 0 85 35t35 85v80q0 17 11.5 28.5T840-560h40v160h-40q-17 0-28.5 11.5T800-360v80q0 50-35 85t-85 35H560Zm-280 0q-50 0-85-35t-35-85v-80q0-17-11.5-28.5T120-400H80v-160h40q17 0 28.5-11.5T160-600v-80q0-50 35-85t85-35h120v80H280q-17 0-28.5 11.5T240-680v80q0 38-22 69t-58 44v14q36 13 58 44t22 69v80q0 17 11.5 28.5T280-240h120v80H280Z",
+  bookmark_add:"M200-120v-640q0-33 23.5-56.5T280-840h240v80H280v518l200-86 200 86v-278h80v400L480-240 200-120Zm80-640h240-240Zm400 160v-80h-80v-80h80v-80h80v80h80v80h-80v80h-80Z",
+  check_circle:"m424-296 282-282-56-56-226 226-114-114-56 56 170 170Zm56 216q-83 0-156-31.5T197-197q-54-54-85.5-127T80-480q0-83 31.5-156T197-763q54-54 127-85.5T480-880q83 0 156 31.5T763-763q54 54 85.5 127T880-480q0 83-31.5 156T763-197q-54 54-127 85.5T480-80Zm0-80q134 0 227-93t93-227q0-134-93-227t-227-93q-134 0-227 93t-93 227q0 134 93 227t227 93Zm0-320Z",
+  warning:"m40-120 440-760 440 760H40Zm138-80h604L480-720 178-200Zm330.5-51.5Q520-263 520-280t-11.5-28.5Q497-320 480-320t-28.5 11.5Q440-297 440-280t11.5 28.5Q463-240 480-240t28.5-11.5ZM440-360h80v-200h-80v200Zm40-100Z",
+  cancel:"m336-280 144-144 144 144 56-56-144-144 144-144-56-56-144 144-144-144-56 56 144 144-144 144 56 56ZM480-80q-83 0-156-31.5T197-197q-54-54-85.5-127T80-480q0-83 31.5-156T197-763q54-54 127-85.5T480-880q83 0 156 31.5T763-763q54 54 85.5 127T880-480q0 83-31.5 156T763-197q-54 54-127 85.5T480-80Zm0-80q134 0 227-93t93-227q0-134-93-227t-227-93q-134 0-227 93t-93 227q0 134 93 227t227 93Zm0-320Z",
+  rotate_right:"M522-80v-82q34-5 66.5-18t61.5-34l56 58q-42 32-88 51.5T522-80Zm-80 0Q304-98 213-199.5T122-438q0-75 28.5-140.5t77-114q48.5-48.5 114-77T482-798h6l-62-62 56-58 160 160-160 160-56-56 64-64h-8q-117 0-198.5 81.5T202-438q0 104 68 182.5T442-162v82Zm322-134-58-56q21-29 34-61.5t18-66.5h82q-5 50-24.5 96T764-214Zm76-264h-82q-5-34-18-66.5T706-606l58-56q32 39 51 86t25 98Z",
+  photo_size_select_large:"M200-120q-33 0-56.5-23.5T120-200v-480h560v560H200Zm0-120h400L464-420 360-280l-64-86-96 126Zm0-520h-80q0-33 23.5-56.5T200-840v80Zm80 0v-80h80v80h-80Zm160 0v-80h80v80h-80Zm160 0v-80h80v80h-80Zm160 0v-80q33 0 56.5 23.5T840-760h-80Zm0 560h80q0 33-23.5 56.5T760-120v-80Zm0-80v-80h80v80h-80Zm0-160v-80h80v80h-80Zm0-160v-80h80v80h-80Z",
+  tune:"M440-120v-240h80v80h320v80H520v80h-80Zm-320-80v-80h240v80H120Zm160-160v-80H120v-80h160v-80h80v240h-80Zm160-80v-80h400v80H440Zm160-160v-240h80v80h160v80H680v80h-80Zm-480-80v-80h400v80H120Z",
+  grid_on:"M200-120q-33 0-56.5-23.5T120-200v-560q0-33 23.5-56.5T200-840h560q33 0 56.5 23.5T840-760v560q0 33-23.5 56.5T760-120H200Zm0-80h133v-133H200v133Zm213 0h134v-133H413v133Zm214 0h133v-133H627v133ZM200-413h133v-134H200v134Zm213 0h134v-134H413v134Zm214 0h133v-134H627v134ZM200-627h133v-133H200v133Zm213 0h134v-133H413v133Zm214 0h133v-133H627v133Z",
+  my_location:"M440-42v-80q-125-14-214.5-103.5T122-440H42v-80h80q14-125 103.5-214.5T440-838v-80h80v80q125 14 214.5 103.5T838-520h80v80h-80q-14 125-103.5 214.5T520-122v80h-80Zm238-240q82-82 82-198t-82-198q-82-82-198-82t-198 82q-82 82-82 198t82 198q82 82 198 82t198-82Zm-311-85q-47-47-47-113t47-113q47-47 113-47t113 47q47 47 47 113t-47 113q-47 47-113 47t-113-47Zm169.5-56.5Q560-447 560-480t-23.5-56.5Q513-560 480-560t-56.5 23.5Q400-513 400-480t23.5 56.5Q447-400 480-400t56.5-23.5ZM480-480Z",
+  straighten:"M160-240q-33 0-56.5-23.5T80-320v-320q0-33 23.5-56.5T160-720h640q33 0 56.5 23.5T880-640v320q0 33-23.5 56.5T800-240H160Zm0-80h640v-320H680v160h-80v-160h-80v160h-80v-160h-80v160h-80v-160H160v320Zm120-160h80-80Zm160 0h80-80Zm160 0h80-80Zm-120 0Z",
+  palette:"M480-80q-82 0-155-31.5t-127.5-86Q143-252 111.5-325T80-480q0-83 32.5-156t88-127Q256-817 330-848.5T488-880q80 0 151 27.5t124.5 76q53.5 48.5 85 115T880-518q0 115-70 176.5T640-280h-74q-9 0-12.5 5t-3.5 11q0 12 15 34.5t15 51.5q0 50-27.5 74T480-80Zm0-400Zm-177 23q17-17 17-43t-17-43q-17-17-43-17t-43 17q-17 17-17 43t17 43q17 17 43 17t43-17Zm120-160q17-17 17-43t-17-43q-17-17-43-17t-43 17q-17 17-17 43t17 43q17 17 43 17t43-17Zm200 0q17-17 17-43t-17-43q-17-17-43-17t-43 17q-17 17-17 43t17 43q17 17 43 17t43-17Zm120 160q17-17 17-43t-17-43q-17-17-43-17t-43 17q-17 17-17 43t17 43q17 17 43 17t43-17ZM480-160q9 0 14.5-5t5.5-13q0-14-15-33t-15-57q0-42 29-67t71-25h70q66 0 113-38.5T800-518q0-121-92.5-201.5T488-800q-136 0-232 93t-96 227q0 133 93.5 226.5T480-160Z",
+  upload_file:"M440-200h80v-167l64 64 56-57-160-160-160 160 57 56 63-63v167ZM240-80q-33 0-56.5-23.5T160-160v-640q0-33 23.5-56.5T240-880h320l240 240v480q0 33-23.5 56.5T720-80H240Zm280-520v-200H240v640h480v-440H520ZM240-800v200-200 640-640Z",
+  visibility:"M607.5-372.5Q660-425 660-500t-52.5-127.5Q555-680 480-680t-127.5 52.5Q300-575 300-500t52.5 127.5Q405-320 480-320t127.5-52.5Zm-204-51Q372-455 372-500t31.5-76.5Q435-608 480-608t76.5 31.5Q588-545 588-500t-31.5 76.5Q525-392 480-392t-76.5-31.5ZM214-281.5Q94-363 40-500q54-137 174-218.5T480-800q146 0 266 81.5T920-500q-54 137-174 218.5T480-200q-146 0-266-81.5ZM480-500Zm207.5 160.5Q782-399 832-500q-50-101-144.5-160.5T480-720q-113 0-207.5 59.5T128-500q50 101 144.5 160.5T480-280q113 0 207.5-59.5Z",
+  edit_note:"M160-400v-80h280v80H160Zm0-160v-80h440v80H160Zm0-160v-80h440v80H160Zm360 560v-123l221-220q9-9 20-13t22-4q12 0 23 4.5t20 13.5l37 37q8 9 12.5 20t4.5 22q0 11-4 22.5T863-380L643-160H520Zm300-263-37-37 37 37ZM580-220h38l121-122-18-19-19-18-122 121v38Zm141-141-19-18 37 37-18-19Z",
+  info:"M440-280h80v-240h-80v240Zm68.5-331.5Q520-623 520-640t-11.5-28.5Q497-680 480-680t-28.5 11.5Q440-657 440-640t11.5 28.5Q463-600 480-600t28.5-11.5ZM480-80q-83 0-156-31.5T197-197q-54-54-85.5-127T80-480q0-83 31.5-156T197-763q54-54 127-85.5T480-880q83 0 156 31.5T763-763q54 54 85.5 127T880-480q0 83-31.5 156T763-197q-54 54-127 85.5T480-80Zm0-80q134 0 227-93t93-227q0-134-93-227t-227-93q-134 0-227 93t-93 227q0 134 93 227t227 93Zm0-320Z",
+  key:"M223.5-423.5Q200-447 200-480t23.5-56.5Q247-560 280-560t56.5 23.5Q360-513 360-480t-23.5 56.5Q313-400 280-400t-56.5-23.5ZM280-240q-100 0-170-70T40-480q0-100 70-170t170-70q67 0 121.5 33t86.5 87h352l120 120-180 180-80-60-80 60-85-60h-47q-32 54-86.5 87T280-240Zm0-80q56 0 98.5-34t56.5-86h125l58 41 82-61 71 55 75-75-40-40H435q-14-52-56.5-86T280-640q-66 0-113 47t-47 113q0 66 47 113t113 47Z"
+};
+function icon(name, cls){
+  const d = ICONS[name]; if (!d) return "";
+  return `<svg class="ic${cls ? " " + cls : ""}" viewBox="0 -960 960 960" aria-hidden="true" focusable="false"><path d="${d}"/></svg>`;
+}
+function paintIcons(root){
+  (root || document).querySelectorAll("[data-ic]").forEach(el => {
+    if (el.dataset.icOn) return;
+    const svg = icon(el.dataset.ic);
+    if (!svg) return;
+    el.insertAdjacentHTML("afterbegin", svg);
+    el.dataset.icOn = "1";
+  });
+}
 
 /* ============================================================
    感性デザイン9項目（山岡俊樹編『デザイン人間工学の基礎』pp.238-240）
@@ -618,7 +704,7 @@ const state = {
   corpus: {}, catOff: new Set(), advice: [], cands: [], stats: null,
   mapView: { k:1, tx:0, ty:0 }, map3: { yaw:-32, pitch:-18, k:1 },
   mapPos: [], mapHover: null, mapDrag: null, mapDragged: false, region: null,
-  anim: null, spread: {}
+  anim: null, spread: {}, thumb: 20
 };
 
 const V = {
@@ -1817,26 +1903,59 @@ function axisSpread(){
   });
   return out;
 }
+const AXIS_SELECTS = ["map-x", "map-y", "map-z", "c-x", "c-y"];
+const AXIS_GROUPS  = [["map-x", "map-y", "map-z"], ["c-x", "c-y"]];
+const TONE = ["#7FB2EE", "#3987E5", "#1F63B8", "#123F7C"];   // ばらつきが大きいほど濃い青
+const TONE_FLAT = "#6B6963", TONE_NA = "#8E8C88", TONE_DUP = "#BDBCB9";
+function axisTone(v){
+  if (v == null) return TONE_NA;
+  if (v < .05) return TONE_FLAT;
+  return TONE[Math.min(TONE.length - 1, Math.floor(Math.min(.999, v / 1.5) * TONE.length))];
+}
+function axisOptLabel(a, v){
+  return v == null ? `${a.name}（未測定）`
+       : v < .05 ? `${a.name}（ばらつきなし）`
+       : `${a.name}（ばらつき ${v.toFixed(1)}）`;
+}
+/* 同じ項目を2つの軸に同時に選べないようにする（選択済みは選択不可・灰色） */
+function syncAxisDupes(){
+  AXIS_GROUPS.forEach(ids => {
+    const sels = ids.map(id => $(id)).filter(s2 => s2 && s2.options.length);
+    const used = new Set(sels.map(s2 => s2.value).filter(v => v && v !== "-"));
+    sels.forEach(s2 => [...s2.options].forEach(o => {
+      const dup = o.value !== "-" && o.value !== s2.value && used.has(o.value);
+      o.disabled = dup;
+      o.style.color = dup ? TONE_DUP : (o.dataset.tone || "");
+      o.style.fontWeight = o.value === s2.value ? "600" : "400";
+    }));
+  });
+}
 function refreshAxisLabels(){
   const sp = axisSpread();
   state.spread = sp;
-  ["map-x", "map-y", "map-z", "c-x", "c-y"].forEach(id => {
-    const sel = $(id); if (!sel) return;
-    [...sel.options].forEach(o => {
-      if (o.value === "-"){ o.textContent = "なし"; return; }
-      const v = sp[o.value];
-      o.textContent = v == null ? `${AX[o.value].name}（未測定）`
-                    : v < .05 ? `${AX[o.value].name}（ばらつきなし）`
-                    : `${AX[o.value].name}（ばらつき ${v.toFixed(1)}）`;
+  const rank = v => v == null ? -1 : v;
+  const order = AXES.slice().sort((a, b) => rank(sp[b.key]) - rank(sp[a.key]) || a.no - b.no);
+  AXIS_SELECTS.forEach(id => {
+    const sel = $(id); if (!sel || !sel.options.length) return;
+    const cur = sel.value, none = sel.options[0].value === "-";
+    sel.innerHTML = "";
+    if (none){ const o = new Option("なし", "-"); o.dataset.tone = TONE_NA; sel.add(o); }
+    order.forEach(a => {
+      const o = new Option(axisOptLabel(a, sp[a.key]), a.key);
+      o.dataset.tone = axisTone(sp[a.key]);
+      sel.add(o);
     });
+    sel.value = cur;
+    if (!sel.value) sel.value = none ? "-" : order[0].key;
   });
+  syncAxisDupes();
   const box = $("spread"); if (!box) return;
   const mx = Math.max(.6, ...AXES.map(a => sp[a.key] || 0));
-  box.innerHTML = `<span class="lab">ばらつき</span>` + AXES.map(a => {
+  box.innerHTML = `<span class="lab">ばらつき（大きい順）</span>` + order.map(a => {
     const v = sp[a.key];
     const flat = v == null || v < .05;
     return `<span class="sp${flat ? " flat" : ""}" title="${a.name} ${flat ? "ばらつきなし" : v.toFixed(2)}">`
-      + `${a.name}<u><i style="width:${flat ? 0 : Math.round(v / mx * 100)}%"></i></u>`
+      + `${a.name}<u><i style="width:${flat ? 0 : Math.round(v / mx * 100)}%;background:${axisTone(v)}"></i></u>`
       + `${flat ? "―" : v.toFixed(1)}</span>`;
   }).join("");
 }
@@ -1850,8 +1969,9 @@ function drawMap(){
     svg.insertAdjacentHTML("afterbegin",
       `<defs><clipPath id="map-clip"><rect x="${PAD.L}" y="${PAD.T}" `
       + `width="${MAP_W - PAD.L - PAD.R}" height="${MAP_H - PAD.T - PAD.B}"/></clipPath>`
-      + CHAIRS.map(c => `<image id="ci-${c.id}" href="${c.src}" x="0" y="0" width="20" height="20" `
-        + `preserveAspectRatio="xMidYMid slice"/>`).join("")
+      + CHAIRS.map(c => `<symbol id="ci-${c.id}" viewBox="0 0 100 100" `
+        + `preserveAspectRatio="xMidYMid slice"><image href="${c.src}" x="0" y="0" width="100" `
+        + `height="100" preserveAspectRatio="xMidYMid slice"/></symbol>`).join("")
       + `</defs><g id="map-layer"></g><g id="map-hover" pointer-events="none"></g>`);
     svg.dataset.ready = "1";
     bindMap(svg);
@@ -1900,7 +2020,7 @@ function mapScene2D(ks, items){
   const px = v => cx + (bx(v) - cx) * V2.k + V2.tx;
   const py = v => cy + (by(v) - cy) * V2.k + V2.ty;
   const line = cssv("--line"), soft = cssv("--line-soft"), ink3 = cssv("--ink-3"), ink2 = cssv("--ink-2");
-  const now = cssv("--now"), goal = cssv("--goal"), paper = cssv("--paper");
+  const now = cssv("--now"), goal = cssv("--goal"), paper = cssv("--paper"), mkt = cssv("--mkt");
   const [xk, yk] = ks;
   let plot = "";
 
@@ -1918,7 +2038,7 @@ function mapScene2D(ks, items){
       if (!groups.has(key)) groups.set(key, []);
       groups.get(key).push(it);
     });
-    const zk = Math.min(2, V2.k), size0 = 20 * zk;
+    const zk = Math.min(2, V2.k), size0 = state.thumb * zk;
     groups.forEach(list => {
       const cols = one ? 1 : Math.ceil(Math.sqrt(list.length)), rows = Math.ceil(list.length / cols);
       list.forEach((it, i) => {
@@ -1992,12 +2112,14 @@ function mapScene2D(ks, items){
     const rx = Math.abs(px(1 + sxv) - px(1)), ry = one ? 16 : Math.abs(py(1 + syv) - py(1));
     plot += `<g pointer-events="none">`
       + `<ellipse cx="${gxc.toFixed(1)}" cy="${gyc.toFixed(1)}" rx="${Math.max(6, rx).toFixed(1)}" `
-      + `ry="${Math.max(6, ry).toFixed(1)}" fill="${ink3}" fill-opacity=".05" stroke="${ink3}" `
-      + `stroke-width="1" stroke-dasharray="3 3"/>`
-      + `<line x1="${(gxc-8).toFixed(1)}" y1="${gyc.toFixed(1)}" x2="${(gxc+8).toFixed(1)}" y2="${gyc.toFixed(1)}" stroke="${ink2}" stroke-width="2"/>`
-      + `<line x1="${gxc.toFixed(1)}" y1="${(gyc-8).toFixed(1)}" x2="${gxc.toFixed(1)}" y2="${(gyc+8).toFixed(1)}" stroke="${ink2}" stroke-width="2"/>`
+      + `ry="${Math.max(6, ry).toFixed(1)}" fill="${mkt}" fill-opacity=".05" stroke="${mkt}" `
+      + `stroke-width="1" stroke-opacity=".55" stroke-dasharray="3 3"/>`
+      + `<line x1="${(gxc-11).toFixed(1)}" y1="${gyc.toFixed(1)}" x2="${(gxc+11).toFixed(1)}" y2="${gyc.toFixed(1)}" stroke="${paper}" stroke-width="4.5"/>`
+      + `<line x1="${gxc.toFixed(1)}" y1="${(gyc-11).toFixed(1)}" x2="${gxc.toFixed(1)}" y2="${(gyc+11).toFixed(1)}" stroke="${paper}" stroke-width="4.5"/>`
+      + `<line x1="${(gxc-10).toFixed(1)}" y1="${gyc.toFixed(1)}" x2="${(gxc+10).toFixed(1)}" y2="${gyc.toFixed(1)}" stroke="${mkt}" stroke-width="2.4"/>`
+      + `<line x1="${gxc.toFixed(1)}" y1="${(gyc-10).toFixed(1)}" x2="${gxc.toFixed(1)}" y2="${(gyc+10).toFixed(1)}" stroke="${mkt}" stroke-width="2.4"/>`
       + `<rect x="${(gxc+10).toFixed(1)}" y="${(gyc-20).toFixed(1)}" width="94" height="16" rx="3" fill="${paper}" opacity=".85"/>`
-      + `<text x="${(gxc+14).toFixed(1)}" y="${(gyc-8).toFixed(1)}" font-size="11" fill="${ink2}" >`
+      + `<text x="${(gxc+14).toFixed(1)}" y="${(gyc-8).toFixed(1)}" font-size="11" font-weight="600" fill="${mkt}" >`
       + `市場の重心 ${fmt(Math.round(mxv*10)/10)}${one ? "" : " / " + fmt(Math.round(myv*10)/10)}</text></g>`;
   }
 
@@ -2042,7 +2164,7 @@ function mapScene3D(ks, items){
   const proj = p => { const k = f / (dist - p[2]); return [cx + p[0] * k, cy - p[1] * k, p[2]]; };
   const at = (a, b, c) => proj(cam([(a - 3) / 2, (b - 3) / 2, (c - 3) / 2]));
   const line = cssv("--line"), soft = cssv("--line-soft"), ink3 = cssv("--ink-3"), ink2 = cssv("--ink-2");
-  const now = cssv("--now"), goal = cssv("--goal"), paper = cssv("--paper");
+  const now = cssv("--now"), goal = cssv("--goal"), paper = cssv("--paper"), mkt = cssv("--mkt");
   let s = "";
 
   // 立方体の枠
@@ -2072,7 +2194,7 @@ function mapScene3D(ks, items){
     const scale = Math.max(.55, Math.min(1.7, 1 / (dist - d.z) * 3.1)) * M.k;
     const [bx2, by2] = blend(d.it, d.x, d.y);
     pos.push({ it:d.it, x:bx2, y:by2 });
-    s += mapMark(d.it, bx2, by2, pos.length - 1, 20 * scale, paper);
+    s += mapMark(d.it, bx2, by2, pos.length - 1, state.thumb * scale, paper);
   });
   state.mapPos = pos;
 
@@ -2081,11 +2203,13 @@ function mapScene3D(ks, items){
     const mv = [mean(xk), mean(yk), mean(zk)];
     const c3 = at(...mv);
     s += `<g pointer-events="none">`
-      + `<circle cx="${c3[0].toFixed(1)}" cy="${c3[1].toFixed(1)}" r="13" fill="${ink3}" fill-opacity=".10" stroke="${ink3}" stroke-dasharray="3 3"/>`
-      + `<line x1="${(c3[0]-8).toFixed(1)}" y1="${c3[1].toFixed(1)}" x2="${(c3[0]+8).toFixed(1)}" y2="${c3[1].toFixed(1)}" stroke="${ink2}" stroke-width="2"/>`
-      + `<line x1="${c3[0].toFixed(1)}" y1="${(c3[1]-8).toFixed(1)}" x2="${c3[0].toFixed(1)}" y2="${(c3[1]+8).toFixed(1)}" stroke="${ink2}" stroke-width="2"/>`
+      + `<circle cx="${c3[0].toFixed(1)}" cy="${c3[1].toFixed(1)}" r="13" fill="${mkt}" fill-opacity=".10" stroke="${mkt}" stroke-opacity=".55" stroke-dasharray="3 3"/>`
+      + `<line x1="${(c3[0]-11).toFixed(1)}" y1="${c3[1].toFixed(1)}" x2="${(c3[0]+11).toFixed(1)}" y2="${c3[1].toFixed(1)}" stroke="${paper}" stroke-width="4.5"/>`
+      + `<line x1="${c3[0].toFixed(1)}" y1="${(c3[1]-11).toFixed(1)}" x2="${c3[0].toFixed(1)}" y2="${(c3[1]+11).toFixed(1)}" stroke="${paper}" stroke-width="4.5"/>`
+      + `<line x1="${(c3[0]-10).toFixed(1)}" y1="${c3[1].toFixed(1)}" x2="${(c3[0]+10).toFixed(1)}" y2="${c3[1].toFixed(1)}" stroke="${mkt}" stroke-width="2.4"/>`
+      + `<line x1="${c3[0].toFixed(1)}" y1="${(c3[1]-10).toFixed(1)}" x2="${c3[0].toFixed(1)}" y2="${(c3[1]+10).toFixed(1)}" stroke="${mkt}" stroke-width="2.4"/>`
       + `<rect x="${(c3[0]+10).toFixed(1)}" y="${(c3[1]-20).toFixed(1)}" width="66" height="16" rx="3" fill="${paper}" opacity=".85"/>`
-      + `<text x="${(c3[0]+14).toFixed(1)}" y="${(c3[1]-8).toFixed(1)}" font-size="11" fill="${ink2}" >市場の重心</text></g>`;
+      + `<text x="${(c3[0]+14).toFixed(1)}" y="${(c3[1]-8).toFixed(1)}" font-size="11" font-weight="600" fill="${mkt}" >市場の重心</text></g>`;
   }
 
   const n3 = at(state.now[xk], state.now[yk], state.now[zk]);
@@ -2319,7 +2443,7 @@ function drawConceptMap(){
   const px = v => x0 + IN + (v - 1) / 4 * (x1 - x0 - IN * 2);
   const py = v => y1 - IN - (v - 1) / 4 * (y1 - y0 - IN * 2);
   const line = cssv("--line"), soft = cssv("--line-soft"), ink3 = cssv("--ink-3"), ink2 = cssv("--ink-2");
-  const now = cssv("--now"), goal = cssv("--goal"), paper = cssv("--paper");
+  const now = cssv("--now"), goal = cssv("--goal"), paper = cssv("--paper"), mkt = cssv("--mkt");
   const edge = k => 1 + k * 4 / N;
 
   // セルごとの競合数
@@ -2367,10 +2491,12 @@ function drawConceptMap(){
   const mean = k => items.length ? items.reduce((t, it) => t + it.p[k], 0) / items.length : 3;
   const mxv = mean(xk), myv = mean(yk), gx0 = px(mxv), gy0 = py(myv);
   s += `<g pointer-events="none">`
-    + `<line x1="${(gx0-9).toFixed(1)}" y1="${gy0.toFixed(1)}" x2="${(gx0+9).toFixed(1)}" y2="${gy0.toFixed(1)}" stroke="${ink2}" stroke-width="2"/>`
-    + `<line x1="${gx0.toFixed(1)}" y1="${(gy0-9).toFixed(1)}" x2="${gx0.toFixed(1)}" y2="${(gy0+9).toFixed(1)}" stroke="${ink2}" stroke-width="2"/>`
+    + `<line x1="${(gx0-11).toFixed(1)}" y1="${gy0.toFixed(1)}" x2="${(gx0+11).toFixed(1)}" y2="${gy0.toFixed(1)}" stroke="${paper}" stroke-width="4.5"/>`
+    + `<line x1="${gx0.toFixed(1)}" y1="${(gy0-11).toFixed(1)}" x2="${gx0.toFixed(1)}" y2="${(gy0+11).toFixed(1)}" stroke="${paper}" stroke-width="4.5"/>`
+    + `<line x1="${(gx0-10).toFixed(1)}" y1="${gy0.toFixed(1)}" x2="${(gx0+10).toFixed(1)}" y2="${gy0.toFixed(1)}" stroke="${mkt}" stroke-width="2.4"/>`
+    + `<line x1="${gx0.toFixed(1)}" y1="${(gy0-10).toFixed(1)}" x2="${gx0.toFixed(1)}" y2="${(gy0+10).toFixed(1)}" stroke="${mkt}" stroke-width="2.4"/>`
     + `<rect x="${(gx0+11).toFixed(1)}" y="${(gy0-19).toFixed(1)}" width="72" height="16" rx="3" fill="${paper}" opacity=".85"/>`
-    + `<text x="${(gx0+15).toFixed(1)}" y="${(gy0-7).toFixed(1)}" font-size="11" fill="${ink2}" >市場の重心</text>`;
+    + `<text x="${(gx0+15).toFixed(1)}" y="${(gy0-7).toFixed(1)}" font-size="11" font-weight="600" fill="${mkt}" >市場の重心</text>`;
   // 重心 → 狙う領域
   if (sel){
     const tx = px(sel.cx), ty = py(sel.cy);
@@ -2838,7 +2964,7 @@ function drawChecks(){
       : ["warn", "動かしているのが画像で表現できる項目だけ。見た目の調整に留まっていないか。"]
   ];
   $("checks").innerHTML = rows.map(([k, t]) =>
-    `<li class="${k}"><span class="mk">${k === "ok" ? "✓" : k === "warn" ? "△" : "✕"}</span><span>${t}</span></li>`).join("");
+    `<li class="${k}"><span class="mk">${icon(k === "ok" ? "check_circle" : k === "warn" ? "warning" : "cancel")}</span><span>${t}</span></li>`).join("");
 }
 
 function drawSaved(){
@@ -2948,6 +3074,110 @@ window.addEventListener("paste", e => {
   if (item) loadFile(item.getAsFile());
 });
 
+
+/* ============================================================
+   AI講評（任意）
+   APIキーは利用者が実行時に入力し、このブラウザの localStorage にのみ置く。
+   ソースにもリポジトリにも書かない。公開ページは外部通信が禁じられているため、
+   ローカルで開いたときだけ動く。
+   ============================================================ */
+const AI_KEY_STORE = "kansei-morph.anthropic-key";
+
+/* いま見えている可視化を JPEG にする */
+function currentViewJPEG(){
+  let cv;
+  if (state.tab === "visual" && state.vis === "3d") cv = $("three");
+  else {
+    if (!processed) drawViewport();
+    const { w, h } = state.src;
+    cv = document.createElement("canvas");
+    cv.width = w; cv.height = h;
+    cv.getContext("2d").putImageData(new ImageData(new Uint8ClampedArray(processed), w, h), 0, 0);
+  }
+  const k = Math.min(1, 1200 / Math.max(cv.width, cv.height));
+  const t = document.createElement("canvas");
+  t.width = Math.max(1, Math.round(cv.width * k));
+  t.height = Math.max(1, Math.round(cv.height * k));
+  t.getContext("2d").drawImage(cv, 0, 0, t.width, t.height);
+  return t.toDataURL("image/jpeg", .85).split(",")[1];
+}
+
+function aiPrompt(){
+  const d = deltas(), id = state.preset || "chair";
+  const p = PRESETS.find(x => x.id === id), ctx = CONTEXT[id] || CONTEXT.chair;
+  const items = visibleCorpus();
+  const mean = k => items.length ? items.reduce((t, it) => t + it.p[k], 0) / items.length : 3;
+  const L = [];
+  L.push(`対象：${p ? p.name : id}（${p ? p.context : ""}）`);
+  L.push(`用途文脈での重要度：${Object.entries(ctx.w).sort((a, b) => b[1] - a[1])
+    .map(([k, v]) => `${AX[k].name} ${v.toFixed(2)}`).join(" / ")}`);
+  const ban = Object.keys(ctx.taboo || {});
+  if (ban.length) L.push(`上げてはいけない項目：${ban.map(k => `${AX[k].name}（${ctx.taboo[k]}）`).join(" / ")}`);
+  L.push("");
+  L.push("【感性デザイン9項目（山岡俊樹）1〜5・0.5刻み】");
+  AXES.forEach(a => L.push(`・${a.name}：現状 ${fmt(state.now[a.key])} → 目標 ${fmt(state.goal[a.key])}`
+    + `（${d[a.key] === 0 ? "±0" : fmtd(d[a.key])}）／市場平均 ${mean(a.key).toFixed(1)}`
+    + `／${a.engine === "pixel" ? "画像で表現できる項目" : "構造の項目（画像では表せない）"}`));
+  L.push("");
+  L.push(`市場コーパス：${items.length}件（${[...new Set(items.map(it => it.cat))].join("、")}）`);
+  if (state.region) L.push(`狙う領域：${AX[state.region.xk].name} ${fmt(state.region.x0)}〜${fmt(state.region.x1)}`
+    + `／${AX[state.region.yk].name} ${fmt(state.region.y0)}〜${fmt(state.region.y1)}`);
+  L.push("");
+  L.push("【設計指示書】");
+  L.push($("brief").value);
+  L.push("");
+  L.push("添付画像は" + (state.tab === "visual" && state.vis === "3d"
+    ? "目標プロファイルを反映した3D形状（概略モデル）" : "目標プロファイルで改変した画像") + "です。");
+  L.push("次の3点を、それぞれ3〜5行で日本語でお願いします。前置きは不要です。");
+  L.push("1. この改変案は用途文脈に対して妥当か（画像と数値の両方を根拠に）");
+  L.push("2. 見落としている項目・矛盾している項目");
+  L.push("3. 次の一手（具体的に、1つだけ）");
+  return L.join("\n");
+}
+
+async function askClaude(){
+  const key = ($("ai-key").value || "").trim(), out = $("ai-out"), btn = $("ai-run");
+  if (!key){ out.value = "APIキーを入力してください（このブラウザにのみ保存されます）。"; return; }
+  btn.disabled = true; out.value = "Claudeに問い合わせています…";
+  try {
+    const res = await fetch("https://api.anthropic.com/v1/messages", {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        "x-api-key": key,
+        "anthropic-version": "2023-06-01",
+        "anthropic-dangerous-direct-browser-access": "true"
+      },
+      body: JSON.stringify({
+        model: $("ai-model").value,
+        max_tokens: 8000,
+        output_config: { effort: "medium" },
+        system: "あなたは山岡俊樹の感性デザイン9項目に通じたデザイン評価者です。"
+          + "指摘は具体的に、根拠を画像と数値に置いてください。褒め言葉や前置きは書きません。",
+        messages: [{ role: "user", content: [
+          { type: "image", source: { type: "base64", media_type: "image/jpeg", data: currentViewJPEG() } },
+          { type: "text", text: aiPrompt() }
+        ]}]
+      })
+    });
+    if (!res.ok){
+      const t = await res.text();
+      out.value = res.status === 401 ? "認証に失敗しました。APIキーを確認してください。"
+        : `エラー ${res.status}\n${t.slice(0, 800)}`;
+      return;
+    }
+    const j = await res.json();
+    if (j.stop_reason === "refusal"){ out.value = "Claudeが応答を控えました。"; return; }
+    out.value = (j.content || []).filter(b => b.type === "text").map(b => b.text).join("\n").trim()
+      || "（空の応答）";
+  } catch (e) {
+    out.value = "通信できませんでした。公開ページは外部への通信が遮断されているため、"
+      + "リポジトリの index.html をローカルで開いて実行してください。\n\n" + e;
+  } finally {
+    btn.disabled = false;
+  }
+}
+
 /* ── タブと工程の操作 ── */
 document.querySelectorAll(".tab").forEach(b =>
   b.addEventListener("click", () => setTab(b.dataset.tab)));
@@ -2958,6 +3188,11 @@ $("vis-img").addEventListener("click", () => setVis("img"));
   state.mapView = { k:1, tx:0, ty:0 };
   animateMap();
 }));
+$("map-size").addEventListener("input", e => {
+  state.thumb = +e.target.value;
+  $("map-size-val").textContent = `${state.thumb}px`;
+  drawMap();
+});
 $("map-zoom-in").addEventListener("click", () => mapZoom(1.35));
 $("map-zoom-out").addEventListener("click", () => mapZoom(1 / 1.35));
 $("map-reset").addEventListener("click", mapReset);
@@ -3015,6 +3250,16 @@ function tick(){
   requestAnimationFrame(tick);
 }
 
+$("ai-key").value = localStorage.getItem(AI_KEY_STORE) || "";
+$("ai-key").addEventListener("change", e => {
+  const v = e.target.value.trim();
+  v ? localStorage.setItem(AI_KEY_STORE, v) : localStorage.removeItem(AI_KEY_STORE);
+});
+$("ai-clear").addEventListener("click", () => {
+  localStorage.removeItem(AI_KEY_STORE); $("ai-key").value = ""; $("ai-out").value = "";
+});
+$("ai-run").addEventListener("click", askClaude);
+
 $("btn-save-cand").addEventListener("click", () => {
   const d = deltas();
   const moved = AXES.filter(a => d[a.key] !== 0);
@@ -3037,6 +3282,7 @@ fillAxisSelects();
 fillConceptSelects();
 usePreset("chair");
 setTab("research");
+paintIcons();
 </script>
 </body>
 </html>
