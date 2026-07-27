@@ -231,33 +231,14 @@ button{cursor:pointer}
   text-decoration:none; position:relative; overflow:hidden}
 .spread .sp u i{position:absolute; left:0; top:0; bottom:0; background:var(--now)}
 .spread .sp.flat{opacity:.45}
-.maprow{display:grid; grid-template-columns:minmax(0,1fr) 200px; gap:16px; align-items:start}
+.maprow{display:block}
 #cmap{width:100%; max-width:820px; height:auto; user-select:none; background:var(--surface);
       border:1px solid var(--line-soft); border-radius:6px}
 #map{width:100%; height:auto; max-height:calc(100vh - 250px); background:var(--surface);
      user-select:none; -webkit-user-select:none; touch-action:none; cursor:grab;
      border:1px solid var(--line-soft); border-radius:6px}
-.maplegend{display:flex; flex-direction:column; gap:2px; font-size:12.5px}
-.maplegend button{
-  display:flex; align-items:center; gap:8px; border:0; background:transparent;
-  color:var(--ink-2); padding:4px 7px; border-radius:4px; text-align:left; font-size:12.5px;
-}
-.maplegend button:hover{background:var(--hover)}
-.maplegend button[aria-pressed="false"]{opacity:.4}
-.maplegend i{width:9px; height:9px; border-radius:50%; flex:0 0 auto}
-.heatkey{display:flex; align-items:center; gap:6px; margin-top:10px; font-size:11.5px; color:var(--ink-3)}
-.heatkey i{flex:1 1 auto; height:8px; border-radius:2px; min-width:56px}
-.maplegend b{margin-left:auto; font-family:var(--font-mono); font-size:11px; font-weight:400; color:var(--ink-3)}
-.cattable{display:flex; flex-direction:column}
-.catrow{
-  display:grid; grid-template-columns:150px 44px minmax(0,300px); gap:10px; align-items:center;
-  font-size:13px; padding:5px 7px; border-radius:4px;
-}
-.catrow:hover{background:var(--hover)}
-.catrow .mini-bars{display:flex; gap:2px; height:20px; align-items:stretch}
-.catrow .mini-bars span{flex:1 1 0; background:var(--line-soft); position:relative; border-radius:2px; overflow:hidden}
-.catrow .mini-bars span i{position:absolute; left:0; right:0; bottom:0; background:var(--now); display:block}
-.catrow em{font-family:var(--font-mono); font-style:normal; font-size:11.5px; color:var(--ink-3); font-variant-numeric:tabular-nums}
+.heatkey{display:flex; align-items:center; gap:5px; font-size:11.5px; color:var(--ink-2)}
+.heatkey i{width:64px; height:8px; border-radius:2px; flex:0 0 auto}
 
 /* ── コンセプト ── */
 .advice{display:flex; flex-direction:column; gap:8px}
@@ -321,12 +302,9 @@ svg text{font-family:var(--font-ui)}
   .deck{grid-template-columns:minmax(0,1fr)}
   .panel.ledger{border-right:0; border-bottom:1px solid var(--line-soft)}
   .evalgrid{grid-template-columns:minmax(0,1fr)}
-  .maprow{grid-template-columns:minmax(0,1fr)}
-  .maplegend{flex-direction:row; flex-wrap:wrap; gap:2px 10px}
 }
 @media (max-width:760px){
   .variants{grid-template-columns:repeat(3,1fr)}
-  .catrow{grid-template-columns:130px 40px minmax(0,1fr)}
 }
 @media (prefers-reduced-motion:reduce){*{transition:none !important}}
 </style>
@@ -385,6 +363,7 @@ svg text{font-family:var(--font-ui)}
         <label>横軸 <select id="map-x"></select></label>
         <label>縦軸 <select id="map-y"></select></label>
         <label>奥行き <select id="map-z"></select></label>
+        <span class="heatkey" id="heatkey"><span>密度</span><i></i><span>少</span><span>多</span></span>
         <label data-ic="photo_size_select_large">サンプルの大きさ
           <input type="range" id="map-size" min="10" max="72" step="2" value="20" aria-label="サンプル画像の大きさ">
           <span class="cap" id="map-size-val">20px</span></label>
@@ -399,11 +378,6 @@ svg text{font-family:var(--font-ui)}
       <div class="spread" id="spread"></div>
       <div class="maprow">
         <svg id="map" viewBox="0 0 760 470" role="img" aria-label="競合の分布図"></svg>
-        <div class="maplegend" id="map-legend"></div>
-      </div>
-      <div class="block">
-        <h3 data-ic="palette">カテゴリ別プロファイル</h3>
-        <div class="cattable" id="cattable"></div>
       </div>
     </div>
   </div>
@@ -1653,7 +1627,7 @@ function drawAll(){
   drawRadar();
   buildOutput();
   clearTimeout(renderTimer);
-  if (state.tab === "research"){ drawMap(); drawCatTable(); }
+  if (state.tab === "research")drawMap();
   if (state.tab === "concept"){ drawConceptMap(); drawAdvice(); }
   if (state.tab === "eval"){ drawChecks(); drawSaved(); }
   if (state.tab === "visual"){
@@ -1768,7 +1742,7 @@ function ensureChairCorpus(){
     clusterItems(items);
     state.corpus.chair = items;
     state.chairLoading = false;
-    if (state.tab === "research"){ drawMap(); drawCatTable(); }
+    if (state.tab === "research")drawMap();
     if (state.tab === "concept"){ drawConceptMap(); drawAdvice(); }
   };
   CHAIRS.forEach((c, i) => {
@@ -1980,22 +1954,11 @@ function drawMap(){
     ks.length >= 3 ? mapScene3D(ks, items) : mapScene2D(ks, items);
   mapPreview(null);
 
-  // 凡例
+  // 密度の目盛（平面のときだけ）
   const cats = catsOf(id);
-  const heat = ks.length >= 3 ? "" :
-    `<div class="heatkey"><span>密度</span><i></i><span>少</span><span>多</span></div>`;
-  $("map-legend").innerHTML = cats.map(([c, ci]) => {
-    const n = all.filter(it => it.cat === c).length;
-    return `<button type="button" data-cat="${c}" aria-pressed="${!state.catOff.has(c)}">`
-      + `<i style="background:${CAT_COLORS[(ci || 0) % CAT_COLORS.length]}"></i>${c}<b>${n}</b></button>`;
-  }).join("") + heat;
-  const key = $("map-legend").querySelector(".heatkey i");
-  if (key) key.style.background = `linear-gradient(90deg, ${HEAT.join(",")})`;
-  $("map-legend").querySelectorAll("button").forEach(b => b.addEventListener("click", () => {
-    const c = b.dataset.cat;
-    state.catOff.has(c) ? state.catOff.delete(c) : state.catOff.add(c);
-    drawMap(); drawCatTable(); drawAdvice();
-  }));
+  const hk = $("heatkey");
+  hk.hidden = ks.length >= 3;
+  hk.querySelector("i").style.background = `linear-gradient(90deg, ${HEAT.join(",")})`;
 
   refreshAxisLabels();
   $("corpus-cap").textContent = state.chairLoading && id === "chair"
@@ -2109,11 +2072,7 @@ function mapScene2D(ks, items){
     const mxv = mean(xk), sxv = sd(xk, mxv);
     const myv = one ? 3 : mean(yk), syv = one ? 0 : sd(yk, myv);
     const gxc = px(mxv), gyc = one ? cy : py(myv);
-    const rx = Math.abs(px(1 + sxv) - px(1)), ry = one ? 16 : Math.abs(py(1 + syv) - py(1));
     plot += `<g pointer-events="none">`
-      + `<ellipse cx="${gxc.toFixed(1)}" cy="${gyc.toFixed(1)}" rx="${Math.max(6, rx).toFixed(1)}" `
-      + `ry="${Math.max(6, ry).toFixed(1)}" fill="${mkt}" fill-opacity=".05" stroke="${mkt}" `
-      + `stroke-width="1" stroke-opacity=".55" stroke-dasharray="3 3"/>`
       + `<line x1="${(gxc-11).toFixed(1)}" y1="${gyc.toFixed(1)}" x2="${(gxc+11).toFixed(1)}" y2="${gyc.toFixed(1)}" stroke="${paper}" stroke-width="4.5"/>`
       + `<line x1="${gxc.toFixed(1)}" y1="${(gyc-11).toFixed(1)}" x2="${gxc.toFixed(1)}" y2="${(gyc+11).toFixed(1)}" stroke="${paper}" stroke-width="4.5"/>`
       + `<line x1="${(gxc-10).toFixed(1)}" y1="${gyc.toFixed(1)}" x2="${(gxc+10).toFixed(1)}" y2="${gyc.toFixed(1)}" stroke="${mkt}" stroke-width="2.4"/>`
@@ -2122,6 +2081,9 @@ function mapScene2D(ks, items){
       + `<text x="${(gxc+14).toFixed(1)}" y="${(gyc-8).toFixed(1)}" font-size="11" font-weight="600" fill="${mkt}" >`
       + `市場の重心 ${fmt(Math.round(mxv*10)/10)}${one ? "" : " / " + fmt(Math.round(myv*10)/10)}</text></g>`;
   }
+
+  // クラスタ（ズームアウトしているときだけ、群の範囲と名前を出す）
+  if (!one && V2.k <= CLUSTER_K) plot += clusterMarks(items, xk, yk, px, py, [x0, x1, y0], paper, ink3);
 
   // 現状・目標
   const nx = px(state.now[xk]), ny = one ? cy : py(state.now[yk]);
@@ -2212,6 +2174,21 @@ function mapScene3D(ks, items){
       + `<text x="${(c3[0]+14).toFixed(1)}" y="${(c3[1]-8).toFixed(1)}" font-size="11" font-weight="600" fill="${mkt}" >市場の重心</text></g>`;
   }
 
+  // クラスタ（ズームアウトしているときだけ）
+  if (M.k <= CLUSTER_K){
+    s += `<g pointer-events="none">`;
+    const chips = [];
+    clusterGroups(items).forEach(([name, list]) => {
+      const col = CAT_COLORS[(list[0].ci || 0) % CAT_COLORS.length];
+      const mv = [xk, yk, zk].map(k => list.reduce((t, it) => t + it.p[k], 0) / list.length);
+      const c = at(...mv);
+      s += `<circle cx="${c[0].toFixed(1)}" cy="${c[1].toFixed(1)}" r="26" fill="${col}" fill-opacity=".06" `
+        + `stroke="${col}" stroke-opacity=".45" stroke-width="1.4" stroke-dasharray="6 4"/>`;
+      chips.push({ name, n:list.length, col, ax:c[0] - 26, ay:c[1] - 50 });
+    });
+    s += clusterChips(chips, [0, MAP_W, 0], paper, ink3) + `</g>`;
+  }
+
   const n3 = at(state.now[xk], state.now[yk], state.now[zk]);
   const g3 = at(state.goal[xk], state.goal[yk], state.goal[zk]);
   s += `<g pointer-events="none">`;
@@ -2219,6 +2196,58 @@ function mapScene3D(ks, items){
     s += `<line x1="${n3[0]}" y1="${n3[1]}" x2="${g3[0]}" y2="${g3[1]}" stroke="${goal}" stroke-width="1.5" stroke-dasharray="4 3"/>`;
   s += marker(n3[0], n3[1], g3[0], g3[1], now, goal, paper, ink2) + `</g>`;
   return s;
+}
+
+/* ズームアウトしているときだけ、群（クラスタ）の広がりと名前を重ねる。
+   拡大すると個々の商品を見る局面なので、じゃまにならないよう消える。 */
+const CLUSTER_K = 1.25;
+function clusterGroups(items){
+  const m = new Map();
+  items.forEach(it => {
+    const k = it.cat || "未分類";
+    if (!m.has(k)) m.set(k, []);
+    m.get(k).push(it);
+  });
+  return [...m];
+}
+/* 見出しどうしが重ならないように、下へずらして置く */
+function clusterChips(chips, box, paper, ink3){
+  const [bx0, bx1, by0] = box;
+  const placed = [];
+  chips.forEach(c => {
+    c.w = c.name.length * 12.5 + 40;
+    c.x = Math.max(bx0 + 3, Math.min(bx1 - c.w - 3, c.ax));
+    c.y = Math.max(by0 + 3, c.ay);
+    let guard = 0;
+    while (guard++ < 12 && placed.some(q =>
+      Math.abs(q.y - c.y) < 22 && c.x < q.x + q.w + 6 && q.x < c.x + c.w + 6)) c.y += 23;
+    placed.push(c);
+  });
+  return placed.map(c =>
+    `<rect x="${c.x.toFixed(1)}" y="${c.y.toFixed(1)}" width="${c.w.toFixed(1)}" height="20" rx="10" `
+    + `fill="${paper}" fill-opacity=".92" stroke="${c.col}" stroke-opacity=".55" stroke-width="1.2"/>`
+    + `<circle cx="${(c.x + 13).toFixed(1)}" cy="${(c.y + 10).toFixed(1)}" r="4.2" fill="${c.col}"/>`
+    + `<text x="${(c.x + 22).toFixed(1)}" y="${(c.y + 14).toFixed(1)}" font-size="12" font-weight="600" fill="${c.col}">`
+    + `${c.name}<tspan fill="${ink3}" font-weight="400"> ${c.n}件</tspan></text>`).join("");
+}
+function clusterMarks(items, xk, yk, px, py, box, paper, ink3){
+  let s = `<g pointer-events="none">`;
+  const chips = [];
+  clusterGroups(items).forEach(([name, list]) => {
+    const col = CAT_COLORS[(list[0].ci || 0) % CAT_COLORS.length];
+    const mx = list.reduce((t, it) => t + it.p[xk], 0) / list.length;
+    const my = list.reduce((t, it) => t + it.p[yk], 0) / list.length;
+    const sx = Math.sqrt(list.reduce((t, it) => t + (it.p[xk] - mx) ** 2, 0) / list.length);
+    const sy = Math.sqrt(list.reduce((t, it) => t + (it.p[yk] - my) ** 2, 0) / list.length);
+    const cx = px(mx), cy = py(my);
+    const rx = Math.max(26, Math.abs(px(1 + sx) - px(1)));
+    const ry = Math.max(22, Math.abs(py(1 + sy) - py(1)));
+    s += `<ellipse cx="${cx.toFixed(1)}" cy="${cy.toFixed(1)}" rx="${rx.toFixed(1)}" ry="${ry.toFixed(1)}" `
+      + `fill="${col}" fill-opacity=".05" stroke="${col}" stroke-opacity=".45" stroke-width="1.4" `
+      + `stroke-dasharray="6 4"/>`;
+    chips.push({ name, n:list.length, col, ax:cx - rx, ay:cy - ry - 24 });
+  });
+  return s + clusterChips(chips, box, paper, ink3) + `</g>`;
 }
 
 /* 軸の見出し：中央に項目名、両端に意味 */
@@ -2385,19 +2414,6 @@ function mapPreview(i){
   layer.innerHTML = g;
 }
 
-function drawCatTable(){
-  const id = state.preset || "chair", all = corpusOf(id);
-  const cats = catsOf(id).map(c => c[0]);
-  $("cattable").innerHTML = cats.map(c => {
-    const rows = all.filter(it => it.cat === c);
-    const bars = AXES.map(a => {
-      const m = rows.reduce((s2, it) => s2 + it.p[a.key], 0) / rows.length;
-      return `<span title="${a.name} ${m.toFixed(1)}"><i style="height:${((m - 1) / 4 * 100).toFixed(0)}%"></i></span>`;
-    }).join("");
-    return `<div class="catrow"><span>${c}</span><em>${rows.length}件</em><span class="mini-bars">${bars}</span></div>`;
-  }).join("");
-}
-
 /* 収集画像の取り込み：自動推定でコーパスに乗せる */
 function addImagesToCorpus(files){
   const id = state.preset || "chair", list = corpusOf(id);
@@ -2416,7 +2432,7 @@ function addImagesToCorpus(files){
       const p = {}; AXES.forEach(a => p[a.key] = est[a.key]);
       list.push({ cat:"収集画像", ci:6, name:f.name, p, src:"画像推定" });
       URL.revokeObjectURL(img.src);
-      if (++done >= total){ drawMap(); drawCatTable(); drawAdvice(); }
+      if (++done >= total){ drawMap(); drawAdvice(); }
     };
     img.src = URL.createObjectURL(f);
   });
