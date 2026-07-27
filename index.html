@@ -358,7 +358,6 @@ svg text{font-family:var(--font-ui)}
       <span class="cap" id="corpus-cap">─</span>
     </div>
     <div class="pane-body">
-      <p class="hint" id="research-note"></p>
       <div class="mapbar">
         <label>横軸 <select id="map-x"></select></label>
         <label>縦軸 <select id="map-y"></select></label>
@@ -370,10 +369,7 @@ svg text{font-family:var(--font-ui)}
         <span class="spacer" style="flex:1 1 auto"></span>
         <button class="btn mini" id="map-zoom-out" aria-label="縮小" data-ic="zoom_out"></button>
         <button class="btn mini" id="map-zoom-in" aria-label="拡大" data-ic="zoom_in"></button>
-        <button class="btn mini" id="map-reset" data-ic="refresh">表示をリセット</button>
         <input type="file" id="corpus-file" accept="image/*" multiple hidden>
-        <button class="btn mini" id="btn-corpus-img" data-ic="add_photo_alternate">画像から追加</button>
-        <button class="btn mini" id="btn-corpus-json" data-ic="save">コーパスを保存</button>
       </div>
       <div class="spread" id="spread"></div>
       <div class="maprow">
@@ -1965,11 +1961,6 @@ function drawMap(){
     ? "実写サンプルを解析中…"
     : `${all.length}件／${cats.length}群（表示 ${items.length}件）・${ks.length}軸`
       + (ks.length >= 3 ? "（立体・ドラッグで回転）" : `（拡大 ${state.mapView.k.toFixed(1)}倍）`);
-  $("research-note").textContent = id === "chair" && CHAIRS.length
-    ? "実写サンプル30点を9項目に自動推定し、クラスタリングで群に分けたもの。点にホバーすると写真が開き、クリックするとその一脚が「現状」になります。"
-      + "軸は1〜3項目まで選べ、3つ選ぶと立体表示になります。ホイールで拡大、ドラッグで移動（立体では回転）。"
-    : "Amazonや画像検索からの収集は外側のパイプラインで行い、ここは受け皿。この対象の初期値は合成コーパスで、「画像から追加」で同じ座標系に乗ります。"
-      + "軸は1〜3項目まで選べ、3つ選ぶと立体表示になります。";
 }
 
 /* ── 1軸・2軸（平面） ── */
@@ -3211,19 +3202,16 @@ $("map-size").addEventListener("input", e => {
 });
 $("map-zoom-in").addEventListener("click", () => mapZoom(1.35));
 $("map-zoom-out").addEventListener("click", () => mapZoom(1 / 1.35));
-$("map-reset").addEventListener("click", mapReset);
-$("btn-corpus-img").addEventListener("click", () => $("corpus-file").click());
+/* ボタンを置かない代わりに、地図そのもので受ける。
+   ダブルクリックで表示を戻し、画像を落とすとコーパスに入る。 */
+$("map").addEventListener("dblclick", mapReset);
 $("corpus-file").addEventListener("change", e => { addImagesToCorpus(e.target.files); e.target.value = ""; });
-$("btn-corpus-json").addEventListener("click", () => {
-  const id = state.preset || "chair";
-  const payload = {
-    target: id, axes: AXES.map(a => a.key),
-    items: corpusOf(id).map(it => ({ name:it.name, category:it.cat, source:it.src, profile:it.p }))
-  };
-  const blob = new Blob([JSON.stringify(payload, null, 2)], { type:"application/json" });
-  const a = document.createElement("a");
-  a.download = `kansei-corpus-${id}.json`; a.href = URL.createObjectURL(blob); a.click();
-  setTimeout(() => URL.revokeObjectURL(a.href), 4000);
+["dragenter", "dragover"].forEach(t =>
+  $("map").addEventListener(t, e => { e.preventDefault(); e.dataTransfer.dropEffect = "copy"; }));
+$("map").addEventListener("drop", e => {
+  e.preventDefault();
+  const f = [...(e.dataTransfer.files || [])].filter(x => x.type.startsWith("image/"));
+  if (f.length) addImagesToCorpus(f);
 });
 
 ["c-x", "c-y", "c-grid"].forEach(id => $(id).addEventListener("change", () => { state.region = null; drawAll(); }));
