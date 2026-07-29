@@ -425,9 +425,6 @@ svg text{font-family:var(--font-ui)}
   <!-- ② コンセプト -->
   <div class="pane full" id="pane-concept" role="tabpanel" aria-label="コンセプト">
     <div class="mapstage" id="cmap-slot">
-      <div class="axholder">
-        <select id="c-x"></select><select id="c-y"></select>
-      </div>
       <aside class="mappanel" id="concept-panel">
         <div class="mappanel-head">
           <h2 data-ic="lightbulb">狙う領域</h2>
@@ -1913,8 +1910,9 @@ function fillAxisSelects(){
   $("map-x").value = "form"; $("map-y").value = "color"; $("map-z").value = "-";
 }
 function mapAxes(){
+  // 調査とコンセプトは同じ軸を使う。コンセプトは平面なので先頭の2つだけ。
   if (state.tab === "concept")
-    return [...new Set([$("c-x").value, $("c-y").value].filter(Boolean))];
+    return [...new Set([$("map-x").value, $("map-y").value].filter(k => k && k !== "-"))];
   if ($("map-y").value === "-") $("map-z").value = "-";
   $("map-z").disabled = $("map-y").value === "-";
   return [...new Set([$("map-x").value, $("map-y").value, $("map-z").value].filter(k => k && k !== "-"))];
@@ -1975,8 +1973,8 @@ function axisSpread(){
   });
   return out;
 }
-const AXIS_SELECTS = ["map-x", "map-y", "map-z", "c-x", "c-y"];
-const AXIS_GROUPS  = [["map-x", "map-y", "map-z"], ["c-x", "c-y"]];
+const AXIS_SELECTS = ["map-x", "map-y", "map-z"];
+const AXIS_GROUPS  = [["map-x", "map-y", "map-z"]];
 const TONE = ["#7FB2EE", "#3987E5", "#1F63B8", "#123F7C"];   // ばらつきが大きいほど濃い青
 const TONE_FLAT = "#6B6963", TONE_NA = "#8E8C88", TONE_DUP = "#BDBCB9";
 function axisTone(v){
@@ -2256,11 +2254,11 @@ function mapScene2D(ks, items){
   [1,2,3,4,5].forEach(v => {
     const tx2 = px(v), ty2 = one ? cy : py(v);
     if (tx2 > x0 - 1 && tx2 < x1 + 1)
-      s += `<rect x="${(tx2 - 12).toFixed(1)}" y="${y1 - 30}" width="24" height="23" rx="11.5" fill="${paper}" opacity=".8"/>`
-        + `<text x="${tx2.toFixed(1)}" y="${y1 - 13}" font-size="15" fill="${ink2}" text-anchor="middle" class="mono">${v}</text>`;
+      s += `<rect x="${(tx2 - 15).toFixed(1)}" y="${y1 - 35}" width="30" height="28" rx="14" fill="${paper}" opacity=".82"/>`
+        + `<text x="${tx2.toFixed(1)}" y="${y1 - 14}" font-size="19" fill="${ink2}" text-anchor="middle" class="mono">${v}</text>`;
     if (!one && ty2 > y0 - 1 && ty2 < y1 + 1)
-      s += `<rect x="${x0 + 6}" y="${(ty2 - 28).toFixed(1)}" width="24" height="23" rx="11.5" fill="${paper}" opacity=".8"/>`
-        + `<text x="${x0 + 18}" y="${(ty2 - 11).toFixed(1)}" font-size="15" fill="${ink2}" text-anchor="middle" class="mono">${v}</text>`;
+      s += `<rect x="${x0 + 6}" y="${(ty2 - 33).toFixed(1)}" width="30" height="28" rx="14" fill="${paper}" opacity=".82"/>`
+        + `<text x="${x0 + 21}" y="${(ty2 - 12).toFixed(1)}" font-size="19" fill="${ink2}" text-anchor="middle" class="mono">${v}</text>`;
   });
   s += axisLabels(AX[xk], !one && AX[yk], x0, x1, y0, y1, ink2, ink3, one);
   // 使っていない軸も押せるように「なし」で出しておく
@@ -2434,20 +2432,22 @@ function arrowSeg(ax, ay, bx, by, col){
 }
 
 const AX_EDGE = 34;   // 両極の文字を枠の端から離す量
+const TXT_MID = 4.8;  // 文字の見た目の中心を、矢印やピルの中心線に合わせる補正
 function axisLabels(ax, ay, x0, x1, y0, y1, ink2, ink3, one){
   const midX = (x0 + x1) / 2, midY = (y0 + y1) / 2, yb = y1 + 30, lx = x0 - 30;
-  let s = `<text x="${x0 + AX_EDGE}" y="${yb + 5}" font-size="13.5" fill="${ink3}">${ax.low || "低"}</text>`
-    + arrowSeg(x0 + AX_EDGE - 6, yb, x0 + 6, yb, ink3)
+  let s = `<text x="${x0 + AX_EDGE}" y="${yb + TXT_MID}" font-size="13.5" fill="${ink3}">${ax.low || "低"}</text>`
+    + arrowSeg(x0 + AX_EDGE - 8, yb, x0 + 6, yb, ink3)
     + axisTap(midX, yb, ax.name, "x", ink2)
-    + `<text x="${x1 - AX_EDGE}" y="${yb + 5}" font-size="13.5" fill="${ink3}" text-anchor="end">${ax.high || "高"}</text>`
-    + arrowSeg(x1 - AX_EDGE + 6, yb, x1 - 6, yb, ink3);
+    + `<text x="${x1 - AX_EDGE}" y="${yb + TXT_MID}" font-size="13.5" fill="${ink3}" text-anchor="end">${ax.high || "高"}</text>`
+    + arrowSeg(x1 - AX_EDGE + 8, yb, x1 - 6, yb, ink3);
   if (ay && !one){
     const yLo = y1 - AX_EDGE, yHi = y0 + AX_EDGE;
-    s += `<text transform="rotate(-90 ${lx} ${yLo})" x="${lx}" y="${yLo}" font-size="13.5" fill="${ink3}">${ay.low || "低"}</text>`
-      + arrowSeg(lx, yLo + 6, lx, y1 - 6, ink3)
+    const tx3 = lx + TXT_MID;
+    s += `<text transform="rotate(-90 ${tx3} ${yLo})" x="${tx3}" y="${yLo}" font-size="13.5" fill="${ink3}">${ay.low || "低"}</text>`
+      + arrowSeg(lx, yLo + 8, lx, y1 - 6, ink3)
       + axisTap(lx, midY, ay.name, "y", ink2, `rotate(-90 ${lx} ${midY})`)
-      + `<text transform="rotate(-90 ${lx} ${yHi})" x="${lx}" y="${yHi}" font-size="13.5" fill="${ink3}" text-anchor="end">${ay.high || "高"}</text>`
-      + arrowSeg(lx, yHi - 6, lx, y0 + 6, ink3);
+      + `<text transform="rotate(-90 ${tx3} ${yHi})" x="${tx3}" y="${yHi}" font-size="13.5" fill="${ink3}" text-anchor="end">${ay.high || "高"}</text>`
+      + arrowSeg(lx, yHi - 8, lx, y0 + 6, ink3);
   }
   return s;
 }
@@ -2635,15 +2635,7 @@ function addImagesToCorpus(files){
 
 
 /* ── コンセプト：市場マップ上でグリッドを切り、狙う領域を指定する ── */
-function fillConceptSelects(){
-  [["c-x", "form"], ["c-y", "color"]].forEach(([id, def]) => {
-    const s = $(id);
-    if (s.options.length) return;
-    AXES.forEach(a => s.add(new Option(a.name, a.key)));
-    s.value = def;
-  });
-}
-const conceptAxes = () => [$("c-x").value, $("c-y").value];
+const conceptAxes = () => [$("map-x").value, $("map-y").value];
 
 /* コンセプト：調査と同じ地図の上に、狙う領域のグリッドを重ねる。
    投影（拡大・移動）は地図と共有しているので、ズームしても格子がずれない。 */
@@ -2652,21 +2644,18 @@ function conceptOverlay(items){
   const [xk, yk] = conceptAxes();
   const N = +$("c-grid").value;
   const line = cssv("--line"), goal = cssv("--goal"), ink2 = cssv("--ink-2"), paper = cssv("--paper");
-  const edge = k => 1 + k * 4 / N;
-
-  // セルごとの競合数
-  const cnt = Array.from({ length: N * N }, () => 0);
-  const cellOf = v => Math.max(0, Math.min(N - 1, Math.floor((v - 1) / 4 * N)));
-  items.forEach(it => cnt[cellOf(it.p[yk]) * N + cellOf(it.p[xk])]++);
   const sel = state.region && state.region.xk === xk && state.region.yk === yk
     && state.region.n === N ? state.region : null;
 
-  // 格子は引かない。選んだ区画だけを枠で示す。
+  // 格子は引かない。選んだ区画だけを、目標の点を中心にした枠で示す。
   let s = "";
+  let n0 = 0;
   if (sel){
-    const n = cnt[sel.j * N + sel.i];
-    const cx0 = P.px(edge(sel.i)), cx1 = P.px(edge(sel.i + 1));
-    const cy1 = P.py(edge(sel.j)), cy0 = P.py(edge(sel.j + 1));
+    const n = items.filter(it => it.p[xk] >= sel.x0 && it.p[xk] <= sel.x1
+                              && it.p[yk] >= sel.y0 && it.p[yk] <= sel.y1).length;
+    n0 = n;
+    const cx0 = P.px(sel.x0), cx1 = P.px(sel.x1);
+    const cy1 = P.py(sel.y0), cy0 = P.py(sel.y1);
     const cap = `競合 ${n}件`;
     s += `<rect x="${cx0.toFixed(1)}" y="${cy0.toFixed(1)}" width="${(cx1-cx0).toFixed(1)}" `
       + `height="${(cy1-cy0).toFixed(1)}" fill="${goal}" fill-opacity=".10" `
@@ -2690,19 +2679,19 @@ function conceptOverlay(items){
       + `<circle cx="${tx.toFixed(1)}" cy="${ty.toFixed(1)}" r="5.5" fill="${goal}"/>`;
   }
 
-  conceptNote(sel, cnt, N, mxv, myv);
+  conceptNote(sel, n0, N, mxv, myv);
   return `<g clip-path="url(#map-clip)">${s}</g>`;
 }
 
 /* 領域の説明と、可視化へ渡すボタンの状態 */
-function conceptNote(sel, cnt, N, mxv, myv){
+function conceptNote(sel, n0, N, mxv, myv){
   const [xk, yk] = conceptAxes(), ax = AX[xk], ay = AX[yk];
   const note = $("c-region");
   if (sel){
     const dir = (v, m, a) => v > m + .15 ? `${a.high || "高"}側へ +${fmt(Math.round((v-m)*10)/10)}`
               : v < m - .15 ? `${a.low || "低"}側へ −${fmt(Math.round((m-v)*10)/10)}` : "重心と同じ";
     note.innerHTML = `狙う領域：<b>${ax.name} ${fmt(sel.x0)}〜${fmt(sel.x1)}／${ay.name} ${fmt(sel.y0)}〜${fmt(sel.y1)}</b>`
-      + `（競合 ${cnt[sel.j * N + sel.i]}件）<br>市場の重心（${ax.name} ${fmt(Math.round(mxv*10)/10)}／${ay.name} ${fmt(Math.round(myv*10)/10)}）から見て、`
+      + `（競合 ${n0}件）<br>市場の重心（${ax.name} ${fmt(Math.round(mxv*10)/10)}／${ay.name} ${fmt(Math.round(myv*10)/10)}）から見て、`
       + `${ax.name}は${dir(sel.cx, mxv, ax)}、${ay.name}は${dir(sel.cy, myv, ay)}。`;
   } else {
     note.textContent = "地図の空いているところをクリックすると、その周辺が狙う領域になります。区画の細かさは下のグリッドで決めます。ホイールで拡大、ドラッグで移動。";
@@ -2725,10 +2714,10 @@ function conceptNote(sel, cnt, N, mxv, myv){
 
 function pickRegion(i, j){
   const [xk, yk] = conceptAxes(), N = +$("c-grid").value;
-  const e = k => 1 + k * 4 / N;
-  const x0 = e(i), x1 = e(i + 1), y0 = e(j), y1 = e(j + 1);
-  const cx = snap((x0 + x1) / 2), cy = snap((y0 + y1) / 2);
-  state.region = { i, j, n:N, xk, yk, x0, x1, y0, y1, cx, cy };
+  const e = k => 1 + k * 4 / N, half = 2 / N;
+  const cx = snap((e(i) + e(i + 1)) / 2), cy = snap((e(j) + e(j + 1)) / 2);
+  state.region = { i, j, n:N, xk, yk, cx, cy,
+                   x0:cx - half, x1:cx + half, y0:cy - half, y1:cy + half };
   state.goal[xk] = cx; state.goal[yk] = cy;
   drawAll();
 }
@@ -3332,8 +3321,8 @@ $("map").addEventListener("dblclick", mapReset);
 /* ── 軸名タップ → 項目を選び直すダイアログ ── */
 const AX_LABEL = { x:"横軸", y:"縦軸", z:"奥行き" };
 function axisSelectId(which){
-  return state.tab === "concept" ? ({ x:"c-x", y:"c-y" })[which]
-                                 : ({ x:"map-x", y:"map-y", z:"map-z" })[which];
+  const id = ({ x:"map-x", y:"map-y", z:"map-z" })[which];
+  return state.tab === "concept" && which === "z" ? null : id;   // コンセプトは平面
 }
 function openAxisModal(which){
   const id = axisSelectId(which), sel = id && $(id);
@@ -3419,7 +3408,7 @@ $("map").addEventListener("drop", e => {
   if (f.length) addImagesToCorpus(f);
 });
 
-["c-x", "c-y", "c-grid"].forEach(id => $(id).addEventListener("change", () => { state.region = null; drawAll(); }));
+$("c-grid").addEventListener("change", () => { state.region = null; drawAll(); });
 $("c-clear").addEventListener("click", () => { state.region = null; drawAll(); });
 $("c-visualize").addEventListener("click", () => { setVis("3d"); setTab("visual"); });
 $("btn-copy-concept").addEventListener("click", async () => {
@@ -3483,7 +3472,6 @@ setMode("goal");
 buildAxes();
 buildPresets();
 fillAxisSelects();
-fillConceptSelects();
 usePreset("chair");
 setDim("2d");
 setTab("research");
