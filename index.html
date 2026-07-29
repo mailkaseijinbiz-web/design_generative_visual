@@ -466,13 +466,9 @@ svg text{font-family:var(--font-ui)}
           <div class="sidegen" id="sidegen" hidden>
             <input type="password" id="side-key" class="keyfield" placeholder="AIza…（Gemini APIキー）" autocomplete="off" spellcheck="false" hidden>
             <button class="btn primary mini" id="side-gen" data-ic="auto_awesome">AIで描く</button>
-            <button class="btn mini" id="side-back" data-ic="view_in_ar" hidden>立体に戻す</button>
             <span class="cap" id="side-gen-note"></span>
           </div>
           <p class="hint" id="c-region"></p>
-          <div class="row" style="margin:0 0 14px">
-            <button class="btn primary" id="c-visualize" disabled data-ic="view_in_ar">この領域で可視化する</button>
-          </div>
         </div>
       </aside>
     </div>
@@ -2762,8 +2758,6 @@ function conceptNote(sel, n0, mxv, myv){
     note.textContent = "地図の空いているところをクリックすると、その周辺が狙う領域になります。"
       + "同じ範囲をもう一度押すと、範囲が半分に絞られます。ホイールで拡大、ドラッグで移動。";
   }
-  const btn = $("c-visualize");
-  if (btn) btn.disabled = !rows.length;
   // 領域を選んだら、その目標の立体を側面に出す
   const view = $("sideview");
   if (view){
@@ -2771,7 +2765,6 @@ function conceptNote(sel, n0, mxv, myv){
     $("sidegen").hidden = !rows.length;
     if (rows.length){
       $("side-img").hidden = true; $("side3d").hidden = false;
-      $("side-back").hidden = true;
       $("sidegen").hidden = false;
       $("side-gen-note").textContent = "";
       render3D($("side3d"));
@@ -3485,7 +3478,7 @@ async function runSideGen(){
     const r = await genImageMulti(key, $("gen-model").value, sideGenPrompt(imgs.length ? refs : []), parts);
     if (r.error){ note.textContent = r.error; return; }
     $("side-img").src = r.url;
-    $("side-img").hidden = false; $("side3d").hidden = true; $("side-back").hidden = false;
+    $("side-img").hidden = false; $("side3d").hidden = true;
     note.textContent = imgs.length
       ? `狙う位置に近い実物 ${imgs.length}点（${refs.map(it => it.name).join("・")}）を手本にしています。狙う領域を変えると立体に戻ります。`
       : "この対象には実写サンプルがないので、立体をもとに描いています。";
@@ -3711,7 +3704,6 @@ $("map").addEventListener("drop", e => {
   if (f.length) addImagesToCorpus(f);
 });
 
-$("c-visualize").addEventListener("click", () => { setVis("3d"); setTab("visual"); });
 /* 3D の視点 */
 $("yaw").addEventListener("input", e => { state.yaw = +e.target.value; render3D(); });
 $("spin").addEventListener("change", e => { state.spin = e.target.checked; if (state.spin) tick(); });
@@ -3758,10 +3750,6 @@ $("gen-clear").addEventListener("click", () => {
 $("gen-run").addEventListener("click", runNanoBanana);
 $("vis-gen").addEventListener("click", () => setVis("gen"));
 $("side-gen").addEventListener("click", runSideGen);
-$("side-back").addEventListener("click", () => {
-  $("side-img").hidden = true; $("side3d").hidden = false; $("side-back").hidden = true;
-  $("side-gen-note").textContent = "";
-});
 
 $("btn-save-cand").addEventListener("click", () => {
   const d = deltas();
