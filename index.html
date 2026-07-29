@@ -280,7 +280,10 @@ button{cursor:pointer}
 /* 領域を選んだときに出る、その狙いの立体 */
 .sideview{position:relative; margin:0 0 12px; border-radius:8px; overflow:hidden;
   border:1px solid var(--line-soft); background:var(--sunk)}
-.sideview canvas{display:block; width:100%; height:auto}
+.sideview canvas, .sideview img{display:block; width:100%; height:auto}
+.sidegen{display:flex; gap:6px; align-items:center; flex-wrap:wrap; margin:0 0 12px}
+.sidegen .keyfield{flex:1 1 100%; min-width:0}
+.sidegen .cap{flex:1 1 100%; color:var(--ink-3); font-size:11.5px; line-height:1.6}
 .sideview .badge{position:absolute; left:8px; top:8px; font-family:var(--font-mono); font-size:10.5px;
   color:var(--ink-2); background:var(--surface); border:1px solid var(--line-soft);
   padding:2px 7px; border-radius:5px}
@@ -457,7 +460,14 @@ svg text{font-family:var(--font-ui)}
         <div class="mappanel-body">
           <div class="sideview" id="sideview" hidden>
             <canvas id="side3d" width="640" height="440"></canvas>
+            <img id="side-img" alt="AIが描いた狙う領域の姿" hidden>
             <span class="badge" id="side3d-badge">─</span>
+          </div>
+          <div class="sidegen" id="sidegen" hidden>
+            <input type="password" id="side-key" class="keyfield" placeholder="AIza…（Gemini APIキー）" autocomplete="off" spellcheck="false" hidden>
+            <button class="btn primary mini" id="side-gen" data-ic="auto_awesome">AIで描く</button>
+            <button class="btn mini" id="side-back" data-ic="view_in_ar" hidden>立体に戻す</button>
+            <span class="cap" id="side-gen-note"></span>
           </div>
           <p class="hint" id="c-region"></p>
           <div class="row" style="margin:0 0 14px">
@@ -2758,7 +2768,12 @@ function conceptNote(sel, n0, mxv, myv){
   const view = $("sideview");
   if (view){
     view.hidden = !rows.length;
+    $("sidegen").hidden = !rows.length;
     if (rows.length){
+      $("side-img").hidden = true; $("side3d").hidden = false;
+      $("side-back").hidden = true;
+      $("sidegen").hidden = false;
+      $("side-gen-note").textContent = "";
       render3D($("side3d"));
       $("side3d-badge").textContent = rows.map(([, k, r]) => `${AX[k].name} ${fmt(r.c)}`).join(" ／ ");
     }
@@ -3343,6 +3358,36 @@ function genSourceJPEG(){
   return [cv.toDataURL("image/jpeg", .9).split(",")[1], "image/jpeg"];
 }
 
+/* 生成の実体。画面のどこから呼んでも同じ経路を通る。 */
+async function genImage(key, model, prompt, data, mime){
+  const res = await fetch(
+    `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`,
+    { method:"POST",
+      headers:{ "content-type":"application/json", "x-goog-api-key":key },
+      body: JSON.stringify({
+        contents: [{ role:"user", parts: [
+          { text: prompt },
+          { inline_data: { mime_type: mime, data } }
+        ]}]
+      }) });
+  if (!res.ok){
+    const t = await res.text();
+    return { error: res.status === 400 || res.status === 403
+      ? `認証か権限で断られました（${res.status}）。キーと、そのキーで画像モデルが使えるかを確かめてください。`
+      : `${res.status}：${t.slice(0, 300)}` };
+  }
+  const j = await res.json();
+  const parts = (((j.candidates || [])[0] || {}).content || {}).parts || [];
+  const img = parts.find(x => x.inlineData || x.inline_data);
+  if (!img){
+    const txt = parts.filter(x => x.text).map(x => x.text).join("\n");
+    return { error: txt ? `画像が返りませんでした。モデルの返答：${txt.slice(0, 300)}` : "画像が返りませんでした。" };
+  }
+  const inl = img.inlineData || img.inline_data;
+  return { url: `data:${inl.mimeType || inl.mime_type || "image/png"};base64,${inl.data}` };
+}
+const GEN_OFFLINE = "外部への通信ができませんでした。公開ページでは遮断されています。ローカルで index.html を開いて試してください。";
+
 async function runNanoBanana(){
   const key = ($("gen-key").value || "").trim();
   const btn = $("gen-run"), note = $("gen-note"), badge = $("gen-badge");
@@ -3351,41 +3396,56 @@ async function runNanoBanana(){
   btn.disabled = true; badge.textContent = "生成中…"; note.textContent = "";
   try {
     const [data, mime] = genSourceJPEG();
-    const res = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`,
-      { method:"POST",
-        headers:{ "content-type":"application/json", "x-goog-api-key":key },
-        body: JSON.stringify({
-          contents: [{ role:"user", parts: [
-            { text: $("gen-prompt").value || genPrompt() },
-            { inline_data: { mime_type: mime, data } }
-          ]}]
-        }) });
-    if (!res.ok){
-      const t = await res.text();
-      note.textContent = res.status === 400 || res.status === 403
-        ? `認証か権限で断られました（${res.status}）。キーと、そのキーで画像モデルが使えるかを確かめてください。`
-        : `${res.status}：${t.slice(0, 300)}`;
-      badge.textContent = "生成できませんでした";
-      return;
-    }
-    const j = await res.json();
-    const parts = (((j.candidates || [])[0] || {}).content || {}).parts || [];
-    const img = parts.find(x => x.inlineData || x.inline_data);
-    if (!img){
-      const txt = parts.filter(x => x.text).map(x => x.text).join("\n");
-      note.textContent = txt ? `画像が返りませんでした。モデルの返答：${txt.slice(0, 300)}` : "画像が返りませんでした。";
-      badge.textContent = "生成できませんでした";
-      return;
-    }
-    const inl = img.inlineData || img.inline_data;
-    $("gen-img").src = `data:${inl.mimeType || inl.mime_type || "image/png"};base64,${inl.data}`;
-    $("gen-img").hidden = false;
+    const r = await genImage(key, model, $("gen-prompt").value || genPrompt(), data, mime);
+    if (r.error){ note.textContent = r.error; badge.textContent = "生成できませんでした"; return; }
+    $("gen-img").src = r.url; $("gen-img").hidden = false;
     badge.textContent = `${model}／${moveSummary()}`;
     note.textContent = "画像を右クリックで保存できます。指示文を書き換えてもう一度押せば描き直せます。";
   } catch (e) {
-    badge.textContent = "生成できませんでした";
-    note.textContent = "外部への通信ができませんでした。公開ページでは遮断されています。ローカルで index.html を開いて試してください。";
+    badge.textContent = "生成できませんでした"; note.textContent = GEN_OFFLINE;
+  } finally { btn.disabled = false; }
+}
+
+/* コンセプトの側面：狙う領域の立体を、Nano Banana に写真として描き直させる */
+function sideGenPrompt(){
+  const id = state.preset || "chair", p = PRESETS.find(x => x.id === id), r = state.region;
+  const L = [];
+  L.push(`この画像は、狙っている${p ? p.name : "製品"}の姿を粗いポリゴンで置いたものです。`);
+  L.push("同じ姿勢・同じ構図のまま、実物の写真のような一枚に描き起こしてください。");
+  if (p) L.push(`用途文脈：${p.context}`);
+  if (r){
+    L.push("");
+    L.push("【狙う位置（山岡俊樹の感性デザイン9項目・1〜5）】");
+    [[r.xk, r.x], [r.yk, r.y]].filter(e => e[1]).forEach(([k, e]) => {
+      const a = AX[k], hi = e.c > 3;
+      L.push(`・${a.name}：${fmt(e.c)}（${fmt(e.lo)}〜${fmt(e.hi)}／${hi ? (a.high || "高") : (a.low || "低")}寄り）`
+        + `／${hi ? (a.bUp || a.up) : (a.bDown || a.down)}`);
+    });
+  }
+  L.push("");
+  L.push("出力は画像1枚だけ。文字・ロゴ・透かしは入れないこと。実在の商品名やブランドは想起させないこと。");
+  return L.join("\n");
+}
+async function runSideGen(){
+  const key = ($("side-key").value || localStorage.getItem(GEN_KEY_STORE) || "").trim();
+  const note = $("side-gen-note"), btn = $("side-gen");
+  if (!key){
+    $("side-key").hidden = false; $("side-key").focus();
+    note.textContent = "Gemini のAPIキーを入れてください。このブラウザにだけ保存します。";
+    return;
+  }
+  localStorage.setItem(GEN_KEY_STORE, key);
+  $("side-key").hidden = true; $("side-key").value = "";
+  btn.disabled = true; note.textContent = "描いています…";
+  try {
+    const data = $("side3d").toDataURL("image/jpeg", .9).split(",")[1];
+    const r = await genImage(key, $("gen-model").value, sideGenPrompt(), data, "image/jpeg");
+    if (r.error){ note.textContent = r.error; return; }
+    $("side-img").src = r.url;
+    $("side-img").hidden = false; $("side3d").hidden = true; $("side-back").hidden = false;
+    note.textContent = "狙う領域を変えると立体に戻ります。";
+  } catch (e) {
+    note.textContent = GEN_OFFLINE;
   } finally { btn.disabled = false; }
 }
 function moveSummary(){
@@ -3652,6 +3712,11 @@ $("gen-clear").addEventListener("click", () => {
 });
 $("gen-run").addEventListener("click", runNanoBanana);
 $("vis-gen").addEventListener("click", () => setVis("gen"));
+$("side-gen").addEventListener("click", runSideGen);
+$("side-back").addEventListener("click", () => {
+  $("side-img").hidden = true; $("side3d").hidden = false; $("side-back").hidden = true;
+  $("side-gen-note").textContent = "";
+});
 
 $("btn-save-cand").addEventListener("click", () => {
   const d = deltas();
