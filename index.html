@@ -83,7 +83,14 @@ button{cursor:pointer}
 }
 .tab:hover{background:var(--hover); color:var(--ink)}
 .tab[aria-selected="true"]{color:var(--ink); font-weight:600; border-bottom-color:var(--ink)}
-.tabbar .presets{margin-left:auto; padding:6px 0}
+.tabbar .searchbox{margin-left:auto}
+.searchbox{display:flex; align-items:center; gap:6px; min-width:0}
+.searchbox input{width:230px; height:32px; padding:0 13px; border:1px solid var(--line);
+  border-radius:16px; background:var(--surface); font:inherit; font-size:13px; color:var(--ink)}
+.searchbox input::placeholder{color:var(--ink-3)}
+.searchbox .cap{max-width:230px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+  color:var(--ink-3); font-size:11.5px}
+.tabbar .presets{padding:6px 0}
 .presets{display:flex; gap:5px; flex-wrap:wrap; align-items:center}
 .chip{
   border:0; background:var(--hover); color:var(--ink-2);
@@ -416,6 +423,11 @@ svg text{font-family:var(--font-ui)}
   <h1>感性モーフ</h1>
   <button class="tab" role="tab" data-tab="map" aria-selected="true" data-ic="search">マップ</button>
   <button class="tab" role="tab" data-tab="settings" aria-selected="false" data-ic="tune">設定</button>
+  <div class="searchbox" id="searchbox">
+    <input type="search" id="theme-q" placeholder="テーマを検索（例：スニーカー）" spellcheck="false" autocomplete="off">
+    <button class="btn mini" id="theme-go" data-ic="search" aria-label="画像を集めて地図にする"></button>
+    <span class="cap" id="theme-note"></span>
+  </div>
   <div class="presets" id="presets" role="group" aria-label="対象"></div>
 </nav>
 
@@ -1340,6 +1352,8 @@ function usePreset(id){
   state.preset = p.id;
   state.catOff.clear();
   state.genImage = null;
+  state.gallery = [];
+  state.region = null;
   if (p.id === "chair" && CHAIRS.length) useChair(state.chairIdx);
   else loadCanvas(makePreset(p), `${p.name}（${p.context}）`);
   syncPresets();
@@ -1352,6 +1366,7 @@ const SAMPLES = window.__SAMPLES || {};
 /* imgId から画像（data URI）を引く。ci-… は実写、si-… は事前レンダ */
 function sampleSrc(imgId){
   if (!imgId) return null;
+  if (imgId.startsWith("qi-")) return QIMG.get(imgId) || null;
   if (imgId.startsWith("ci-")){
     const c = CHAIRS.find(x => `ci-${x.id}` === imgId);
     return c ? c.src : null;
@@ -1376,6 +1391,103 @@ function useChair(i){
     syncPresets();
   };
   img.src = c.src;
+}
+
+/* ── テーマ検索：Wikimedia Commons から画像を集め、その場で市場マップにする ──
+   ライセンスと作者は各点に保持し、ホバーで出す。集めた画像はこのブラウザのメモリにだけ置く。 */
+const QIMG = new Map();
+let themeSeq = 0;
+async function searchTheme(qRaw){
+  const q = (qRaw || "").trim(), note = $("theme-note");
+  if (!q) return;
+  const seq = ++themeSeq, N = 25;
+  note.textContent = "検索中…";
+  try {
+    const api = "https://commons.wikimedia.org/w/api.php?origin=*&action=query&format=json"
+      + "&generator=search&gsrnamespace=6&gsrlimit=40"
+      + "&gsrsearch=" + encodeURIComponent(`filetype:bitmap ${q}`)
+      + "&prop=imageinfo&iiprop=url|mime|extmetadata&iiurlwidth=560";
+    const res = await fetch(api);
+    if (!res.ok) throw new Error("api " + res.status);
+    const j = await res.json();
+    const pages = Object.values(((j || {}).query || {}).pages || {})
+      .map(pg => ({ title: pg.title || "", info: (pg.imageinfo || [])[0] }))
+      .filter(e => e.info && /image\/(jpe?g|png)/.test(e.info.mime || ""));
+    if (!pages.length) throw new Error("empty");
+    const strip = html => { const d = document.createElement("div"); d.innerHTML = html || ""; return d.textContent.trim(); };
+    const items = [];
+    let next = 0;
+    const lane = async () => {
+      while (items.length < N && next < pages.length && seq === themeSeq){
+        const e = pages[next++];
+        try {
+          const r = await fetch(e.info.thumburl || e.info.url);
+          if (!r.ok) continue;
+          const blob = await r.blob();
+          const durl = await new Promise(ok => { const fr = new FileReader(); fr.onload = () => ok(fr.result); fr.readAsDataURL(blob); });
+          const img = await new Promise((ok, ng) => { const im = new Image(); im.onload = () => ok(im); im.onerror = ng; im.src = durl; });
+          if (items.length >= N || seq !== themeSeq) return;
+          // 実写サンプルと同じ経路：300pxで9項目を推定する
+          const k = Math.min(1, 300 / Math.max(img.naturalWidth, img.naturalHeight));
+          const cv = document.createElement("canvas");
+          cv.width = Math.max(1, Math.round(img.naturalWidth * k));
+          cv.height = Math.max(1, Math.round(img.naturalHeight * k));
+          const g = cv.getContext("2d", { willReadFrequently:true });
+          g.drawImage(img, 0, 0, cv.width, cv.height);
+          const est = estimate(g.getImageData(0, 0, cv.width, cv.height).data, cv.width, cv.height);
+          const prof = {}; AXES.forEach(a => prof[a.key] = est[a.key]);
+          const meta = e.info.extmetadata || {};
+          const id = `qi-${seq}-${items.length}`;
+          QIMG.set(id, durl);
+          items.push({ name: e.title.replace(/^File:/, "").replace(/\.[a-z]+$/i, "").slice(0, 42),
+                       p: prof, src:"実写", imgId:id, idx:items.length, cat:"検索", ci:0,
+                       measured:MEASURABLE,
+                       lic: strip((meta.LicenseShortName || {}).value),
+                       by: strip((meta.Artist || {}).value).slice(0, 42) });
+          note.textContent = `収集中… ${items.length}/${N}`;
+        } catch (_) { /* 読めない画像は飛ばして次へ */ }
+      }
+    };
+    await Promise.all([0, 1, 2, 3, 4, 5].map(lane));
+    if (seq !== themeSeq) return;
+    if (items.length < 8) throw new Error("few");
+    items.forEach((it, i) => it.idx = i);
+    clusterItems(items);
+    registerSearchPreset(q, items);
+    note.textContent = `「${q}」${items.length}枚を配置しました（Wikimedia Commons）`;
+  } catch (_) {
+    if (seq !== themeSeq) return;
+    note.textContent = "画像を集められませんでした。公開ページなど、外部に出られる場所で試してください。";
+  }
+}
+function registerSearchPreset(q, items){
+  // 前の検索で集めた画像を片づける
+  [...QIMG.keys()].filter(k => !items.some(it => it.imgId === k)).forEach(k => QIMG.delete(k));
+  const pr = { id:"q", name:q, context:`画像検索「${q}」／Wikimedia Commons`, tex:0,
+               draw:(g, w, h) => { g.fillStyle = "#ECECEA"; g.fillRect(0, 0, w, h); } };
+  const i = PRESETS.findIndex(x => x.id === "q");
+  if (i >= 0) PRESETS[i] = pr; else PRESETS.push(pr);
+  CONTEXT.q = { w:Object.fromEntries(AXES.map(a => [a.key, .5])), taboo:{} };
+  state.corpus.q = items;
+  injectSearchSymbols(items);
+  buildPresets();
+  usePreset("q");
+}
+function injectSearchSymbols(items){
+  const svg = $("map");
+  if (!svg || !svg.dataset.ready) return;
+  const defs = svg.querySelector("defs");
+  defs.querySelectorAll("symbol[id^='qi-']").forEach(n => n.remove());
+  const NS = "http://www.w3.org/2000/svg";
+  items.forEach(it => {
+    const s = document.createElementNS(NS, "symbol");
+    s.setAttribute("id", it.imgId);
+    s.setAttribute("viewBox", "0 0 100 100");
+    s.setAttribute("preserveAspectRatio", "xMidYMid slice");
+    s.innerHTML = `<image href="${QIMG.get(it.imgId)}" x="0" y="0" width="100" height="100" `
+      + `preserveAspectRatio="xMidYMid slice" clip-path="url(#thumb-clip)"/>`;
+    defs.appendChild(s);
+  });
 }
 
 function buildPresets(){
@@ -2416,7 +2528,8 @@ function mapPreview(i){
   const ty = by + (img ? side + 12 : 6) + 18;
   g += `<text x="${bx + 11}" y="${ty}" font-size="12"  fill="${cssv("--ink")}">${it.name}</text>`
     +  `<circle cx="${bx + 15}" cy="${ty + 15}" r="4" fill="${col}"/>`
-    +  `<text x="${bx + 25}" y="${ty + 19}" font-size="11"  fill="${cssv("--ink-3")}">${it.cat}`
+    +  `<text x="${bx + 25}" y="${ty + 19}" font-size="11"  fill="${cssv("--ink-3")}">`
+    +  `${(it.cat + (it.lic ? `　${it.lic}${it.by ? "・" + it.by : ""}` : "")).slice(0, 30)}`
     +  `</text>`;
   // 元の点も強調
   g += it.imgId
@@ -3355,6 +3468,8 @@ $("gen-clear").addEventListener("click", () => {
   localStorage.removeItem(GEN_KEY_STORE); $("gen-key").value = "";
 });
 $("side-gen").addEventListener("click", runSideGen);
+$("theme-go").addEventListener("click", () => searchTheme($("theme-q").value));
+$("theme-q").addEventListener("keydown", e => { if (e.key === "Enter") searchTheme(e.target.value); });
 $("grid-gen").addEventListener("click", runGridGen);
 
 /* 起動 */
