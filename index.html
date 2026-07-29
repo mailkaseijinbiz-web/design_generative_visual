@@ -276,11 +276,19 @@ button{cursor:pointer}
 .rgnrow .dir{font-size:12px; color:var(--goal); white-space:nowrap}
 .rgnrow .btn{padding:2px 5px; border-color:transparent; background:transparent}
 .rgnrow .btn:hover{background:var(--hover); box-shadow:none}
+.rgntitle{margin:0 0 10px; font-size:15px; font-weight:600; line-height:1.5; color:var(--ink)}
 .rgnsum{margin:0; font-size:12.5px; line-height:1.75; color:var(--ink-2)}
 /* 領域を選んだときに出る、その狙いの立体 */
 .sideview{position:relative; margin:0 0 12px; border-radius:8px; overflow:hidden;
-  border:1px solid var(--line-soft); background:var(--sunk)}
-.sideview canvas, .sideview img{display:block; width:100%; height:auto}
+  border:1px solid var(--line-soft); background:var(--sunk); aspect-ratio:1/1}
+.sideview canvas, .sideview img{display:block; width:100%; height:100%; object-fit:cover}
+.spin{position:absolute; inset:0; display:grid; place-items:center; background:rgba(255,255,255,.72)}
+.spin i{
+  width:34px; height:34px; border-radius:50%; display:block;
+  border:3px solid var(--line); border-top-color:var(--now); animation:spin .8s linear infinite;
+}
+@keyframes spin{to{transform:rotate(360deg)}}
+@media (prefers-reduced-motion:reduce){.spin i{animation-duration:2.4s}}
 .sidegen{display:flex; gap:6px; align-items:center; flex-wrap:wrap; margin:0 0 12px}
 .sidegen .keyfield{flex:1 1 100%; min-width:0}
 .sidegen .cap{flex:1 1 100%; color:var(--ink-3); font-size:11.5px; line-height:1.6}
@@ -459,13 +467,14 @@ svg text{font-family:var(--font-ui)}
         </div>
         <div class="mappanel-body">
           <div class="sideview" id="sideview" hidden>
-            <canvas id="side3d" width="640" height="440"></canvas>
+            <canvas id="side3d" width="620" height="620"></canvas>
             <img id="side-img" alt="AIが描いた狙う領域の姿" hidden>
+            <div class="spin" id="side-spin" hidden><i></i></div>
             <span class="badge" id="side3d-badge">─</span>
           </div>
           <div class="sidegen" id="sidegen" hidden>
             <input type="password" id="side-key" class="keyfield" placeholder="AIza…（Gemini APIキー）" autocomplete="off" spellcheck="false" hidden>
-            <button class="btn primary mini" id="side-gen" data-ic="auto_awesome">AIで描く</button>
+            <button class="btn mini" id="side-gen" data-ic="auto_awesome">描き直す</button>
             <span class="cap" id="side-gen-note"></span>
           </div>
           <p class="hint" id="c-region"></p>
@@ -790,7 +799,8 @@ const state = {
   corpus: {}, catOff: new Set(), advice: [], cands: [], stats: null,
   mapView: { k:1, tx:0, ty:0 }, map3: { yaw:-32, pitch:-18, k:1 },
   mapPos: [], mapHover: null, mapDrag: null, mapDragged: false, region: null,
-  anim: null, spread: {}, thumb: 20, mapProj: null, axModal: null, dim: "2d", conceptText: ""
+  anim: null, spread: {}, thumb: 20, mapProj: null, axModal: null, dim: "2d", conceptText: "",
+  genImage: null
 };
 
 const V = {
@@ -1443,6 +1453,7 @@ function usePreset(id){
   const p = PRESETS.find(x => x.id === id) || PRESETS[0];
   state.preset = p.id;
   state.catOff.clear();
+  state.genImage = null;
   if (p.id === "chair" && CHAIRS.length) useChair(state.chairIdx);
   else loadCanvas(makePreset(p), `${p.name}（${p.context}）`);
   syncPresets();
@@ -2129,6 +2140,8 @@ function drawMap(){
       `<defs><clipPath id="map-clip"><rect x="${PAD.L}" y="${PAD.T}" `
       + `width="${MAP_W - PAD.L - PAD.R}" height="${MAP_H - PAD.T - PAD.B}"/></clipPath>`
       + `<clipPath id="thumb-clip"><rect x="0" y="0" width="100" height="100" rx="9"/></clipPath>`
+      + `<clipPath id="gen-clip" clipPathUnits="objectBoundingBox">`
+      + `<rect x="0" y="0" width="1" height="1" rx=".07" ry=".07"/></clipPath>`
       + `<filter id="thumb-sh" x="-40%" y="-40%" width="180%" height="180%">`
       + `<feDropShadow dx="0" dy="1.6" stdDeviation="2.2" flood-color="#101010" flood-opacity=".3"/></filter>`
       + CHAIRS.map(c => `<symbol id="ci-${c.id}" viewBox="0 0 100 100" `
@@ -2716,6 +2729,19 @@ function conceptOverlay(items){
       + `stroke="${goal}" stroke-width="2.5"/>`;
   }
 
+  // 生成した姿を、狙う位置に置く
+  const gi = state.genImage;
+  if (gi && gi.xk === xk && gi.yk === yk){
+    const ix = P.px(gi.cx == null ? mxv : gi.cx), iy = P.py(gi.cy == null ? myv : gi.cy);
+    const S = Math.max(64, Math.min(180, state.thumb * 2.2)), h2 = S / 2;
+    s += `<rect x="${(ix - h2).toFixed(1)}" y="${(iy - h2).toFixed(1)}" width="${S}" height="${S}" `
+      + `rx="${(S * .07).toFixed(1)}" fill="${paper}" filter="url(#thumb-sh)"/>`
+      + `<image href="${gi.url}" x="${(ix - h2).toFixed(1)}" y="${(iy - h2).toFixed(1)}" `
+      + `width="${S}" height="${S}" preserveAspectRatio="xMidYMid slice" clip-path="url(#gen-clip)"/>`
+      + `<rect x="${(ix - h2).toFixed(1)}" y="${(iy - h2).toFixed(1)}" width="${S}" height="${S}" `
+      + `rx="${(S * .07).toFixed(1)}" fill="none" stroke="${goal}" stroke-width="2.5"/>`;
+  }
+
   // 重心 → 狙う領域
   if (sel){
     const gx0 = P.px(mxv), gy0 = P.py(myv);
@@ -2742,7 +2768,8 @@ function conceptNote(sel, n0, mxv, myv){
                 : v < m - .15 ? `${a.low || "低"}側へ −${fmt(Math.round((m - v) * 10) / 10)}`
                 : "重心と同じ";
   if (rows.length){
-    note.innerHTML = `<div class="rgnlist">` + rows.map(([w, k, r, m]) => {
+    note.innerHTML = `<p class="rgntitle">${regionTitle(rows)}</p>`
+      + `<div class="rgnlist">` + rows.map(([w, k, r, m]) => {
       const a = AX[k];
       return `<div class="rgnrow"><b>${a.name}</b>`
         + `<span class="rng mono">${fmt(r.lo)}〜${fmt(r.hi)}</span>`
@@ -2756,7 +2783,7 @@ function conceptNote(sel, n0, mxv, myv){
     paintIcons(note);
   } else {
     note.textContent = "地図の空いているところをクリックすると、その周辺が狙う領域になります。"
-      + "同じ範囲をもう一度押すと、範囲が半分に絞られます。ホイールで拡大、ドラッグで移動。";
+      + "押し直せば別の場所へ移せます。ホイールで拡大、ドラッグで移動。";
   }
   // 領域を選んだら、その目標の立体を側面に出す
   const view = $("sideview");
@@ -2764,7 +2791,8 @@ function conceptNote(sel, n0, mxv, myv){
     view.hidden = !rows.length;
     $("sidegen").hidden = !rows.length;
     if (rows.length){
-      $("side-img").hidden = true; $("side3d").hidden = false;
+      const keep = state.genImage && state.genImage.xk === rows[0][1];
+      if (!keep){ $("side-img").hidden = true; $("side3d").hidden = false; }
       $("sidegen").hidden = false;
       $("side-gen-note").textContent = "";
       render3D($("side3d"));
@@ -2773,36 +2801,49 @@ function conceptNote(sel, n0, mxv, myv){
   }
 }
 
-/* 数値を日本語に置き直した3行 */
+/* 狙いに題を付ける。数値ではなく、軸の両極の言葉で名づける。 */
+function poleWord(a, v){
+  return Math.abs(v - 3) < .5 ? "どちらでもない" : v > 3 ? (a.high || "高") : (a.low || "低");
+}
+function regionTitle(rows){
+  const id = state.preset || "chair", p = PRESETS.find(x => x.id === id);
+  // 市場の重心から見てどちらへ動くかで名づける
+  const w = rows.filter(([, , r, m]) => Math.abs(r.c - m) >= .4)
+    .map(([, k, r, m]) => r.c - m > 0 ? (AX[k].high || "高") : (AX[k].low || "低"));
+  if (!w.length) return `市場の真ん中をいく${p ? p.name : "案"}`;
+  return `${w.join("　×　")}　の${p ? p.name : "案"}`;
+}
+
+/* 数値を使わずに、狙いを言葉で言い直す */
 function regionSentences(rows, n0){
+  const gap = d => { const x = Math.abs(d);
+    return x < .4 ? "ほぼ同じところ" : x < 1 ? "わずかに離れたところ" : x < 2 ? "はっきり離れたところ" : "大きく離れたところ"; };
   const L = [];
-  L.push(`市場の重心は ${rows.map(([, k, , m]) => `${AX[k].name} ${fmt(Math.round(m * 10) / 10)}`).join("／")} のあたりにあります。`);
-  L.push(`狙うのは ${rows.map(([, k, r]) => {
-    const a = AX[k], hi = r.c > 3;
-    return `${a.name}が${fmt(r.lo)}〜${fmt(r.hi)}（${hi ? (a.high || "高") : (a.low || "低")}寄り）`;
-  }).join("、")} の範囲です。`);
+  L.push(`いまの市場は、${rows.map(([, k, , m]) => `${AX[k].name}は${poleWord(AX[k], m)}あたり`).join("、")}に集まっています。`);
+  const far = rows.map(([, k, r, m]) => Math.abs(r.c - m)).sort((a, b) => b - a)[0];
+  const moves = rows.filter(([, , r, m]) => Math.abs(r.c - m) >= .4)
+    .map(([, k, r, m]) => `${AX[k].name}を${r.c - m > 0 ? (AX[k].high || "高") : (AX[k].low || "低")}へ`);
+  const stays = rows.filter(([, , r, m]) => Math.abs(r.c - m) < .4).map(([, k]) => AX[k].name);
+  L.push(`狙うのは、そこから${gap(far)}。`
+    + (moves.length ? `${moves.join("、")}振ります。` : "")
+    + (stays.length ? `${stays.join("と")}は市場と同じままにします。` : ""));
   L.push(n0 === 0
-    ? "この範囲に競合はいません。空いている場所を取りにいく案になります。"
-    : `この範囲には競合が${n0}件います。近い相手と、どこで違いを出すかを決める必要があります。`);
+    ? "ここに競合はいません。まだ誰もいない場所を取りにいく案です。"
+    : n0 <= 2 ? "近いところに少数の相手がいます。何で違いを出すかを決める必要があります。"
+    : "ここは混んでいます。同じ場所で戦うことになるので、別の項目で差をつけるか、狙いをずらすかです。");
   return L.join("<br>");
 }
 
-/* 狙う領域は軸ごとに持つ。押すたびに範囲が半分に絞られ、
-   軸ごとに指定を外せる。 */
+/* 狙う領域は軸ごとに持つ。押した場所を中心に、決まった広さで置く。 */
 function pickRegion(vx, vy){
   const [xk, yk] = conceptAxes();
-  const r = state.region && state.region.xk === xk && state.region.yk === yk ? state.region : null;
-  const inX = !r || !r.x || (vx >= r.x.lo && vx <= r.x.hi);
-  const inY = !r || !r.y || (vy >= r.y.lo && vy <= r.y.hi);
-  const inside = !!r && (r.x || r.y) && inX && inY;
-  const lvl = inside ? Math.min(4, r.lvl + 1) : 1;
-  const half = (2 / CONCEPT_N) / Math.pow(2, lvl - 1);
+  const half = 2 / CONCEPT_N;
   const mk = v => { const c = snap(v); return { lo:Math.max(1, c - half), hi:Math.min(5, c + half), c }; };
-  state.region = { lvl, xk, yk,
-    x: inside && !r.x ? null : mk(vx),
-    y: inside && !r.y ? null : mk(vy) };
+  state.region = { xk, yk, x: mk(vx), y: mk(vy) };
   applyRegion();
+  state.genImage = null;
   drawAll();
+  queueSideGen();
 }
 function applyRegion(){
   const r = state.region; if (!r) return;
@@ -3354,17 +3395,23 @@ function genSourceJPEG(){
 /* 生成の実体。画面のどこから呼んでも同じ経路を通る。 */
 const genImage = (key, model, prompt, data, mime) =>
   genImageMulti(key, model, prompt, [{ mime_type:mime, data }]);
-async function genImageMulti(key, model, prompt, imgs){
-  const res = await fetch(
-    `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`,
-    { method:"POST",
-      headers:{ "content-type":"application/json", "x-goog-api-key":key },
-      body: JSON.stringify({
-        contents: [{ role:"user", parts: [
-          { text: prompt },
-          ...imgs.map(im => ({ inline_data: im }))
-        ]}]
-      }) });
+async function genImageMulti(key, model, prompt, imgs, square){
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`;
+  const body = {
+    contents: [{ role:"user", parts: [
+      { text: prompt },
+      ...imgs.map(im => ({ inline_data: im }))
+    ]}]
+  };
+  if (square) body.generationConfig = { imageConfig: { aspectRatio: "1:1" } };
+  const send = () => fetch(url, { method:"POST",
+    headers:{ "content-type":"application/json", "x-goog-api-key":key },
+    body: JSON.stringify(body) });
+  let res = await send();
+  if (!res.ok && res.status === 400 && body.generationConfig){
+    delete body.generationConfig;      // 縦横比の指定に対応しないモデルなら外して一度だけ再試行
+    res = await send();
+  }
   if (!res.ok){
     const t = await res.text();
     return { error: res.status === 400 || res.status === 403
@@ -3427,10 +3474,10 @@ function sideGenPrompt(refs){
     L.push("");
     L.push(`これらの素材・作り・撮り方を手本にして、**次の位置を狙った新しい${p ? p.name : "製品"}**を1枚描いてください。`);
     L.push("どれかの複製にはせず、狙う位置のぶんだけ手本からずらすこと。");
-    L.push("被写体は1点、背景は白に近い無地、参考写真と似た画角で。");
+    L.push("被写体は1点、背景は白に近い無地、参考写真と似た画角で。**正方形（1:1）の画像**にしてください。");
   } else {
     L.push(`この画像は、狙っている${p ? p.name : "製品"}の姿を粗いポリゴンで置いたものです。`);
-    L.push("同じ姿勢・同じ構図のまま、実物の写真のような一枚に描き起こしてください。");
+    L.push("同じ姿勢・同じ構図のまま、実物の写真のような一枚に描き起こしてください。**正方形（1:1）の画像**にしてください。");
   }
   if (p) L.push(`用途文脈：${p.context}`);
   if (r){
@@ -3458,33 +3505,50 @@ function refBase64(it){
   const m = /^data:(image\/[a-z+]+);base64,(.+)$/.exec(c.src);
   return m ? { mime_type:m[1], data:m[2] } : null;
 }
+/* 目標を置くたびに自動で走る。連打しても最後の一回だけ投げる。 */
+let sideGenTimer = 0, sideGenSeq = 0;
+function queueSideGen(){
+  clearTimeout(sideGenTimer);
+  if (!localStorage.getItem(GEN_KEY_STORE)) return;   // キーがなければ待つ
+  sideGenTimer = setTimeout(runSideGen, 700);
+}
 async function runSideGen(){
   const key = ($("side-key").value || localStorage.getItem(GEN_KEY_STORE) || "").trim();
-  const note = $("side-gen-note"), btn = $("side-gen");
+  const note = $("side-gen-note"), btn = $("side-gen"), spin = $("side-spin");
+  if (!state.region) return;
   if (!key){
     $("side-key").hidden = false; $("side-key").focus();
-    note.textContent = "Gemini のAPIキーを入れてください。このブラウザにだけ保存します。";
+    note.textContent = "Gemini のAPIキーを入れてください。入れると、目標を置くたびに自動で描きます。";
     return;
   }
   localStorage.setItem(GEN_KEY_STORE, key);
   $("side-key").hidden = true; $("side-key").value = "";
-  btn.disabled = true; note.textContent = "描いています…";
+  const seq = ++sideGenSeq;
+  btn.disabled = true; spin.hidden = false; note.textContent = "描いています…";
   try {
     const refs = sideRefs(3);
     const imgs = refs.map(refBase64).filter(Boolean);
     const parts = imgs.length
       ? imgs
       : [{ mime_type:"image/jpeg", data:$("side3d").toDataURL("image/jpeg", .9).split(",")[1] }];
-    const r = await genImageMulti(key, $("gen-model").value, sideGenPrompt(imgs.length ? refs : []), parts);
+    const r = await genImageMulti(key, $("gen-model").value,
+      sideGenPrompt(imgs.length ? refs : []), parts, true);
+    if (seq !== sideGenSeq) return;                   // 追い越された結果は捨てる
     if (r.error){ note.textContent = r.error; return; }
     $("side-img").src = r.url;
     $("side-img").hidden = false; $("side3d").hidden = true;
+    const rg = state.region;
+    state.genImage = { url:r.url, xk:rg.xk, yk:rg.yk,
+                       cx: rg.x ? rg.x.c : null, cy: rg.y ? rg.y.c : null };
+    drawMap();
     note.textContent = imgs.length
-      ? `狙う位置に近い実物 ${imgs.length}点（${refs.map(it => it.name).join("・")}）を手本にしています。狙う領域を変えると立体に戻ります。`
+      ? `狙う位置に近い実物 ${imgs.length}点（${refs.map(it => it.name).join("・")}）を手本にしています。`
       : "この対象には実写サンプルがないので、立体をもとに描いています。";
   } catch (e) {
-    note.textContent = GEN_OFFLINE;
-  } finally { btn.disabled = false; }
+    if (seq === sideGenSeq) note.textContent = GEN_OFFLINE;
+  } finally {
+    if (seq === sideGenSeq){ btn.disabled = false; spin.hidden = true; }
+  }
 }
 function moveSummary(){
   const d = deltas(), moved = AXES.filter(a => d[a.key] !== 0);
