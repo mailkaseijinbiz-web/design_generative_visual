@@ -45,7 +45,8 @@ body{
 }
 button,input,select,textarea{font:inherit; color:inherit}
 button{cursor:pointer}
-:focus-visible{outline:2px solid var(--now); outline-offset:1px; border-radius:4px}
+:focus-visible{outline:none}
+.field:focus-visible, .keyfield:focus-visible{box-shadow:0 0 0 2px var(--now)}
 
 /* ── ページ見出し（工程タブと同じ段に置く） ── */
 .tabbar h1{
@@ -282,6 +283,10 @@ button{cursor:pointer}
 .sideview{position:relative; margin:0 0 12px; border-radius:8px; overflow:hidden;
   border:1px solid var(--line-soft); background:var(--sunk); aspect-ratio:1/1}
 .sideview canvas, .sideview img{display:block; width:100%; height:100%; object-fit:cover}
+.sideempty{position:absolute; inset:0; margin:0; display:grid; place-items:center; padding:24px;
+  text-align:center; font-size:12.5px; line-height:1.8; color:var(--ink-3)}
+.sidegen #side-dir{flex:1 1 100%; font-family:var(--font-ui)}
+.rgntitle span{letter-spacing:.02em}
 .spin{position:absolute; inset:0; display:grid; place-items:center; background:rgba(255,255,255,.72)}
 .spin i{
   width:34px; height:34px; border-radius:50%; display:block;
@@ -289,6 +294,8 @@ button{cursor:pointer}
 }
 @keyframes spin{to{transform:rotate(360deg)}}
 @media (prefers-reduced-motion:reduce){.spin i{animation-duration:2.4s}}
+.gridgen{display:flex; gap:6px; align-items:center; flex-wrap:wrap; margin:0 0 12px}
+.gridgen .cap{flex:1 1 100%; color:var(--ink-3); font-size:11.5px; line-height:1.6}
 .sidegen{display:flex; gap:6px; align-items:center; flex-wrap:wrap; margin:0 0 12px}
 .sidegen .keyfield{flex:1 1 100%; min-width:0}
 .sidegen .cap{flex:1 1 100%; color:var(--ink-3); font-size:11.5px; line-height:1.6}
@@ -355,16 +362,11 @@ svg text{font-family:var(--font-ui)}
 }
 /* 軸名のタップ領域 */
 .axtap{cursor:pointer}
-.axtap rect{
-  fill:var(--surface); fill-opacity:.9; stroke:var(--line); stroke-width:1.2;
-  backdrop-filter:blur(10px); -webkit-backdrop-filter:blur(10px);
-  transition:fill-opacity .12s, stroke .12s, filter .12s;
-}
-.axtap:hover rect, .axtap:focus-visible rect{fill-opacity:1; stroke:var(--now);
-  filter:drop-shadow(0 1px 4px rgba(15,15,15,.14))}
-.axtap.muted rect{stroke-dasharray:5 4}
-.axtap .caret{opacity:.55}
-.axtap:hover .caret{opacity:1}
+.axtap rect{fill:var(--now); stroke:none; transition:fill-opacity .12s}
+.axtap:hover rect{fill-opacity:.86}
+.axtap.muted rect{fill-opacity:.5}
+.axtap text, .axtap .caret{fill:#fff}
+.axtap .caret{stroke:#fff}
 
 /* 軸を選び直すダイアログ */
 .modal{position:fixed; inset:0; z-index:100; display:grid; place-items:center; padding:20px;
@@ -412,15 +414,12 @@ svg text{font-family:var(--font-ui)}
 
 <nav class="tabbar" role="tablist" aria-label="工程">
   <h1>感性モーフ</h1>
-  <button class="tab" role="tab" data-tab="research" aria-selected="true" data-ic="search">調査</button>
-  <button class="tab" role="tab" data-tab="concept" aria-selected="false" data-ic="lightbulb">コンセプト</button>
-  <button class="tab" role="tab" data-tab="visual" aria-selected="false" data-ic="view_in_ar">可視化</button>
-  <button class="tab" role="tab" data-tab="eval" aria-selected="false" data-ic="fact_check">評価</button>
+  <button class="tab" role="tab" data-tab="map" aria-selected="true" data-ic="search">マップ</button>
   <button class="tab" role="tab" data-tab="settings" aria-selected="false" data-ic="tune">設定</button>
   <div class="presets" id="presets" role="group" aria-label="対象"></div>
 </nav>
 
-<main class="deck">
+<main class="deck no-rail">
 
   <!-- ① 評価台帳 -->
   <section class="panel ledger">
@@ -440,9 +439,9 @@ svg text{font-family:var(--font-ui)}
   <!-- 工程パネル -->
   <section class="panel work">
 
-  <!-- ① 調査 -->
-  <div class="pane full" id="pane-research" role="tabpanel" aria-label="調査">
-    <div class="mapstage" id="maprow">
+  <!-- マップ -->
+  <div class="pane full" id="pane-map" role="tabpanel" aria-label="マップ">
+    <div class="mapstage" id="map-slot">
       <svg id="map" viewBox="0 0 760 470" role="img" aria-label="競合の分布図"></svg>
       <div class="axholder">
         <select id="map-x"></select><select id="map-y"></select><select id="map-z"></select>
@@ -454,27 +453,25 @@ svg text{font-family:var(--font-ui)}
           <button class="btn" id="map-zoom-out" aria-label="縮小" data-ic="zoom_out"></button>
         </div>
       </div>
-    </div>
-  </div>
-
-  <!-- ② コンセプト -->
-  <div class="pane full" id="pane-concept" role="tabpanel" aria-label="コンセプト">
-    <div class="mapstage" id="cmap-slot">
       <aside class="mappanel" id="concept-panel">
         <div class="mappanel-head">
           <h2 data-ic="lightbulb">狙う領域</h2>
           <span class="cap" id="concept-cap">─</span>
         </div>
         <div class="mappanel-body">
+          <div class="gridgen">
+            <button class="btn mini" id="grid-gen" data-ic="grid_on">5×5の25通りを一気に描く</button>
+            <span class="cap" id="grid-note"></span>
+          </div>
           <div class="sideview" id="sideview" hidden>
-            <canvas id="side3d" width="620" height="620"></canvas>
-            <img id="side-img" alt="AIが描いた狙う領域の姿" hidden>
+            <img id="side-img" alt="AIが描いた狙う位置の姿" hidden>
+            <p class="sideempty" id="side-empty">目標を置くと、AIがこの位置の姿を描きます。</p>
             <div class="spin" id="side-spin" hidden><i></i></div>
-            <span class="badge" id="side3d-badge">─</span>
           </div>
           <div class="sidegen" id="sidegen" hidden>
             <input type="password" id="side-key" class="keyfield" placeholder="AIza…（Gemini APIキー）" autocomplete="off" spellcheck="false" hidden>
-            <button class="btn mini" id="side-gen" data-ic="auto_awesome">描き直す</button>
+            <input type="text" id="side-dir" class="keyfield" placeholder="例：脚をもっと細く、座面を広く">
+            <button class="btn mini" id="side-gen" data-ic="auto_awesome">この指示で描き直す</button>
             <span class="cap" id="side-gen-note"></span>
           </div>
           <p class="hint" id="c-region"></p>
@@ -483,146 +480,7 @@ svg text{font-family:var(--font-ui)}
     </div>
   </div>
 
-  <!-- ③ 可視化 -->
-  <div class="pane" id="pane-visual" role="tabpanel" aria-label="可視化">
-    <div class="panel-head">
-      <h2 data-ic="view_in_ar">可視化</h2>
-      <div class="modeswitch" role="group" aria-label="表示">
-        <button id="vis-3d" aria-pressed="true" data-ic="view_in_ar">3D形状</button>
-        <button id="vis-img" aria-pressed="false" data-ic="image">画像改変</button>
-        <button id="vis-gen" aria-pressed="false" data-ic="auto_awesome">AI画像生成</button>
-      </div>
-    </div>
-
-    <div class="stage-body" id="stage-3d">
-      <div class="stage3d" id="stage3d-box">
-        <canvas id="three" width="900" height="620"></canvas>
-        <span class="badge" id="three-badge">─</span>
-      </div>
-      <div class="wipe">
-        <span>視点</span>
-        <input type="range" id="yaw" min="-180" max="180" value="-28" aria-label="回転">
-        <label style="display:flex;align-items:center;gap:5px"><input type="checkbox" id="spin"> 自動回転</label>
-      </div>
-      <div class="parts" id="parts"></div>
-      <div class="readout" id="readout3d"></div>
-    </div>
-
-    <div class="stage-body" id="stage-img" hidden>
-      <div class="viewport" id="viewport">
-        <canvas id="view"></canvas>
-        <span class="badge l">現状</span>
-        <span class="badge r">改変案</span>
-        <div class="dropzone" id="dropzone"></div>
-      </div>
-      <label class="wipe">
-        <span>比較</span>
-        <input type="range" id="wipe" min="0" max="100" value="42" aria-label="現状と改変案の比較位置">
-        <span id="wipe-val" class="cap">42%</span>
-      </label>
-      <div>
-        <div class="panel-head" style="padding:0 0 6px; border:0">
-          <h2 style="font-size:12px" data-ic="grid_on">派生案</h2>
-          <span class="cap">目標プロファイルを揺らした8案／選ぶと目標に採用</span>
-        </div>
-        <div class="variants" id="variants"></div>
-      </div>
-      <div class="readout" id="readout"></div>
-    </div>
-
-    <div class="stage-body" id="stage-gen" hidden>
-      <p class="hint">いまの画像と9項目の差分を <strong>Gemini の画像モデル（Nano Banana）</strong> に渡して、
-        目標プロファイルどおりに描き直してもらいます。APIキーは<strong>この画面で入力し、ブラウザのlocalStorageにだけ保存</strong>します。
-        コードにもリポジトリにも書き込みません。公開ページは外部通信が遮断されているため、<strong>ローカルで index.html を開いたときだけ</strong>動きます。</p>
-      <div class="row" style="margin-bottom:10px">
-        <input type="password" id="gen-key" class="keyfield" placeholder="AIza… （自分のGemini APIキー）" autocomplete="off" spellcheck="false">
-        <select id="gen-model" aria-label="モデル">
-          <option value="gemini-2.5-flash-image">Nano Banana（gemini-2.5-flash-image）</option>
-          <option value="gemini-3-pro-image-preview">Nano Banana Pro（gemini-3-pro-image-preview）</option>
-        </select>
-        <button class="btn primary mini" id="gen-run" data-ic="auto_awesome">この目標で描いてもらう</button>
-        <button class="btn mini" id="gen-clear" data-ic="delete">キーを消す</button>
-      </div>
-      <div class="genrow">
-        <div class="viewport" id="gen-view">
-          <img id="gen-img" alt="生成された改変案" hidden>
-          <span class="badge l" id="gen-badge">まだ生成していません</span>
-        </div>
-        <div class="genside">
-          <h3 data-ic="edit_note">渡す指示文</h3>
-          <textarea class="brief" id="gen-prompt" spellcheck="false" aria-label="生成に渡す指示文"></textarea>
-          <p class="cap" id="gen-note" style="margin:8px 0 0"></p>
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <!-- ④ 評価 -->
-  <div class="pane" id="pane-eval" role="tabpanel" aria-label="評価">
-    <div class="panel-head">
-      <h2 data-ic="fact_check">差分と評価</h2>
-      <span class="cap">現状 → 目標</span>
-    </div>
-    <div class="pane-body">
-     <div class="evalgrid">
-      <div>
-        <svg class="radar" id="radar" width="300" height="244" viewBox="0 0 300 244" role="img" aria-label="9項目プロファイル図"></svg>
-        <div class="legend">
-          <span class="n"><i></i>現状</span>
-          <span class="g"><i></i>目標</span>
-        </div>
-        <div class="block">
-          <h3 data-ic="fact_check">妥当性チェック</h3>
-          <ul class="checks" id="checks"></ul>
-        </div>
-      </div>
-      <div>
-      <div class="block">
-        <h3 data-ic="tune">画像処理レシピ</h3>
-        <ul class="recipe" id="recipe"></ul>
-      </div>
-
-      <div class="block">
-        <h3 data-ic="edit_note">設計指示書（構造項目を含む）</h3>
-        <textarea class="brief" id="brief" spellcheck="false" aria-label="設計指示書"></textarea>
-        <div class="row" style="margin-top:8px">
-          <button class="btn mini" id="btn-copy" data-ic="content_copy">指示書をコピー</button>
-          <button class="btn mini" id="btn-json" data-ic="data_object">レシピをJSONで保存</button>
-        </div>
-      </div>
-
-      <div class="block">
-        <h3 data-ic="auto_awesome">AI講評（Claude）</h3>
-        <p class="hint">いまの可視化と9項目の差分をClaudeに送り、用途文脈から見た妥当性を講評してもらいます。
-          APIキーは<strong>この画面で入力し、ブラウザのlocalStorageにだけ保存</strong>します。コードにもリポジトリにも書き込みません。
-          公開ページは外部通信が遮断されているため、<strong>ローカルで index.html を開いたときだけ</strong>動きます。</p>
-        <div class="row" style="margin-bottom:8px">
-          <input type="password" id="ai-key" class="keyfield" placeholder="sk-ant-… （自分のAPIキー）" autocomplete="off" spellcheck="false">
-          <select id="ai-model" aria-label="モデル">
-            <option value="claude-opus-5">Opus 5</option>
-            <option value="claude-sonnet-5">Sonnet 5</option>
-            <option value="claude-haiku-4-5">Haiku 4.5</option>
-          </select>
-          <button class="btn primary mini" id="ai-run" data-ic="auto_awesome">いまの案を講評してもらう</button>
-          <button class="btn mini" id="ai-clear" data-ic="delete">キーを消す</button>
-        </div>
-        <textarea class="brief" id="ai-out" readonly spellcheck="false" aria-label="AI講評"
-          placeholder="ここに講評が出ます。"></textarea>
-      </div>
-
-      <div class="block">
-        <h3 data-ic="bookmark_add">案の記録</h3>
-        <div class="row" style="margin-bottom:6px">
-          <button class="btn mini" id="btn-save-cand" data-ic="bookmark_add">いまの案を記録する</button>
-        </div>
-        <ul class="saved" id="saved"></ul>
-      </div>
-      </div>
-     </div>
-    </div>
-  </div>
-
-  <!-- ⑤ 設定 -->
+  <!-- 設定 -->
   <div class="pane" id="pane-settings" role="tabpanel" aria-label="設定">
     <div class="panel-head">
       <h2 data-ic="tune">設定</h2>
@@ -637,6 +495,26 @@ svg text{font-family:var(--font-ui)}
           <button id="dim-3d" aria-pressed="false" data-ic="view_in_ar">3次元</button>
         </div>
         <p class="hint" id="dim-note" style="margin-top:12px"></p>
+      </div>
+      <div class="block">
+        <h3 data-ic="auto_awesome">AIによる描画（Gemini / Nano Banana）</h3>
+        <p class="hint">マップで目標を置くと、狙う位置にいちばん近い実物の写真を手本に、AIがその位置の姿を描きます。
+          APIキーは<strong>この画面で入力し、ブラウザのlocalStorageにだけ保存</strong>します。コードにもリポジトリにも書き込みません。
+          公開ページは外部通信が遮断されているため、<strong>ローカルか、自分で公開したページでだけ</strong>動きます。</p>
+        <div class="row">
+          <input type="password" id="gen-key" class="keyfield" placeholder="AIza… （自分のGemini APIキー）" autocomplete="off" spellcheck="false">
+          <select id="gen-model" aria-label="モデル">
+            <option value="gemini-2.5-flash-image">Nano Banana（gemini-2.5-flash-image）</option>
+            <option value="gemini-3-pro-image-preview">Nano Banana Pro（gemini-3-pro-image-preview）</option>
+          </select>
+          <select id="gen-lanes" aria-label="同時に描く枚数">
+            <option value="4">同時に4枚（控えめ）</option>
+            <option value="8" selected>同時に8枚（標準）</option>
+            <option value="13">同時に13枚（速い）</option>
+            <option value="25">同時に25枚（一気に・制限に当たりやすい）</option>
+          </select>
+          <button class="btn mini" id="gen-clear" data-ic="delete">キーを消す</button>
+        </div>
       </div>
     </div>
   </div>
@@ -701,6 +579,13 @@ const ICONS = {
 function icon(name, cls){
   const d = ICONS[name]; if (!d) return "";
   return `<svg class="ic${cls ? " " + cls : ""}" viewBox="0 -960 960 960" aria-hidden="true" focusable="false"><path d="${d}"/></svg>`;
+}
+/* ボタンの字と絵を差し替える。textContent で消えた絵を描き直せるようにする。 */
+function setBtn(el, name, label){
+  el.textContent = label;
+  el.dataset.ic = name;
+  delete el.dataset.icOn;
+  paintIcons(el.parentNode || el);
 }
 function paintIcons(root){
   (root || document).querySelectorAll("[data-ic]").forEach(el => {
@@ -792,7 +677,7 @@ const state = {
   src: null,        // {w,h,data:Uint8ClampedArray} 原画（表示解像度）
   preset: "glasses",
   label: "",
-  tab: "research",
+  tab: "map",
   vis: "3d",
   yaw: -28, pitch: -14, spin: false,
   chairIdx: 0, chairLoading: false,
@@ -800,7 +685,8 @@ const state = {
   mapView: { k:1, tx:0, ty:0 }, map3: { yaw:-32, pitch:-18, k:1 },
   mapPos: [], mapHover: null, mapDrag: null, mapDragged: false, region: null,
   anim: null, spread: {}, thumb: 20, mapProj: null, axModal: null, dim: "2d", conceptText: "",
-  genImage: null
+  genImage: null,
+  gallery: []          // 描いた姿は地図に残す
 };
 
 const V = {
@@ -1112,8 +998,7 @@ function estimate(src, w, h){
    ============================================================ */
 const $ = id => document.getElementById(id);
 const cssv = n => getComputedStyle(document.body).getPropertyValue(n).trim();
-const view = $("view"), vctx = view.getContext("2d", { willReadFrequently:true });
-let processed = null, renderTimer = 0;
+let renderTimer = 0;
 
 /* ============================================================
    見本画像（すべて手続き生成／外部素材なし）
@@ -1504,49 +1389,10 @@ function loadCanvas(canvas, label){
   state.label = label;
   const est = estimate(data, w, h);
   AXES.forEach(a => { state.now[a.key] = est[a.key]; state.goal[a.key] = est[a.key]; });
-  view.width = w; view.height = h;
   drawAll();
 }
 
-function loadFile(file){
-  if (!file || !file.type.startsWith("image/")) return;
-  const img = new Image();
-  img.onload = () => {
-    const c = document.createElement("canvas");
-    c.width = img.naturalWidth; c.height = img.naturalHeight;
-    c.getContext("2d").drawImage(img, 0, 0);
-    state.preset = null;
-    loadCanvas(c, file.name || "読み込み画像");
-    syncPresets();
-    URL.revokeObjectURL(img.src);
-  };
-  img.src = URL.createObjectURL(file);
-}
-
 const deltas = () => Object.fromEntries(AXES.map(a => [a.key, state.goal[a.key] - state.now[a.key]]));
-
-function drawViewport(){
-  const { w, h, data } = state.src;
-  const d = deltas();
-  const t0 = performance.now();
-  processed = renderPixels(data, w, h, d);
-  const ms = performance.now() - t0;
-
-  const out = new ImageData(new Uint8ClampedArray(processed), w, h);
-  vctx.putImageData(out, 0, 0);
-  const cut = Math.round(w * state.wipe / 100);
-  if (cut > 0){
-    vctx.putImageData(new ImageData(new Uint8ClampedArray(data), w, h), 0, 0, 0, 0, cut, h);
-    vctx.save();
-    vctx.strokeStyle = "rgba(255,255,255,.85)"; vctx.lineWidth = 1;
-    vctx.beginPath(); vctx.moveTo(cut + .5, 0); vctx.lineTo(cut + .5, h); vctx.stroke();
-    vctx.restore();
-  }
-  const moved = PIXEL_KEYS.filter(k => d[k] !== 0).length;
-  $("readout").innerHTML =
-    `<span>${state.label}</span><span>${w}×${h} px</span><span>描画 ${ms.toFixed(0)} ms</span>` +
-    `<span>可動 ${moved}/${PIXEL_KEYS.length} 項目</span><span>Σ|Δ| ${fmt(AXES.reduce((s,a)=>s+Math.abs(d[a.key]),0))}</span>`;
-}
 
 /* ── 台帳 ── */
 function buildAxes(){
@@ -1608,37 +1454,6 @@ function syncAxes(){
 /* ── プロファイル図 ── */
 const SHORT = { atmos:"雰囲気", image:"イメージ", color:"色彩", fit:"フィット",
                 form:"形態", func:"機能性", matter:"質感", combi:"組合せ", surp:"意外性" };
-function drawRadar(){
-  const svg = $("radar"), W = 300, H = 244, cx = W / 2, cy = H / 2 + 2, R = 80;
-  const ink = getComputedStyle(document.body).getPropertyValue("--line").trim();
-  const ink3 = getComputedStyle(document.body).getPropertyValue("--ink-3").trim();
-  const cNow = getComputedStyle(document.body).getPropertyValue("--now").trim();
-  const cGoal = getComputedStyle(document.body).getPropertyValue("--goal").trim();
-  const pt = (i, v) => {
-    const ang = -Math.PI / 2 + i * 2 * Math.PI / AXES.length, r = R * (v - 1) / 4 * .9 + R * .1;
-    return [cx + Math.cos(ang) * r, cy + Math.sin(ang) * r];
-  };
-  let s = "";
-  for (let ring = 1; ring <= 4; ring++){
-    const p = AXES.map((_, i) => pt(i, 1 + ring).map(n => n.toFixed(1)).join(",")).join(" ");
-    s += `<polygon points="${p}" fill="none" stroke="${ink}" stroke-width="${ring === 4 ? 1 : .5}"/>`;
-  }
-  AXES.forEach((a, i) => {
-    const [x, y] = pt(i, 5);
-    s += `<line x1="${cx}" y1="${cy}" x2="${x.toFixed(1)}" y2="${y.toFixed(1)}" stroke="${ink}" stroke-width=".5"/>`;
-    const lx = cx + (x - cx) * 1.16, ly = cy + (y - cy) * 1.16;
-    const anchor = Math.abs(lx - cx) < 8 ? "middle" : lx > cx ? "start" : "end";
-    s += `<text x="${lx.toFixed(1)}" y="${(ly + 3.5).toFixed(1)}" font-size="11" fill="${ink3}" text-anchor="${anchor}" >${SHORT[a.key]}</text>`;
-  });
-  const poly = (get, color, dash) => {
-    const p = AXES.map((a, i) => pt(i, get(a.key)).map(n => n.toFixed(1)).join(",")).join(" ");
-    return `<polygon points="${p}" fill="${color}" fill-opacity=".10" stroke="${color}" stroke-width="1.6" ${dash ? `stroke-dasharray="${dash}"` : ""}/>`;
-  };
-  s += poly(k => state.now[k], cNow, "3 3");
-  s += poly(k => state.goal[k], cGoal, "");
-  svg.innerHTML = s;
-}
-
 /* ── レシピと指示書 ── */
 const OPS = {
   atmos:  d => d > 0 ? `露出 +${(.10*d/4*100).toFixed(0)}% ／ 暖色 +${(8*d/4).toFixed(1)} ／ ブルーム ${(.55*d/4).toFixed(2)}`
@@ -1655,108 +1470,12 @@ const OPS = {
                      : `色相の収束 ${(60*Math.abs(d)/4).toFixed(0)}%`
 };
 
-function buildOutput(){
-  const d = deltas();
-  const moved = AXES.filter(a => d[a.key] !== 0);
-
-  const ul = $("recipe");
-  const pix = moved.filter(a => a.engine === "pixel");
-  ul.innerHTML = pix.length
-    ? pix.map(a => `<li><b>${fmtd(d[a.key])}</b><span>${a.name}：${OPS[a.key](d[a.key])}</span></li>`).join("")
-    : `<li class="empty">目標を現状からずらすと、ここに画像処理の内訳が出ます。</li>`;
-
-  const L = [];
-  L.push(`■ 改変指示書 ─ 感性デザイン9項目`);
-  L.push(`対象：${state.label}`);
-  L.push("");
-  L.push(`【現状プロファイル】`);
-  L.push(AXES.map(a => `${a.name} ${fmt(state.now[a.key])}`).join(" / "));
-  L.push(`【目標プロファイル】`);
-  L.push(AXES.map(a => `${a.name} ${fmt(state.goal[a.key])}`).join(" / "));
-  L.push("");
-  if (!moved.length){
-    L.push("差分なし。現状維持。");
-  } else {
-    L.push(`【動かす項目（${moved.length}）】`);
-    moved.forEach(a => {
-      const dv = d[a.key];
-      L.push(`・${a.name}（${fmt(state.now[a.key])}→${fmt(state.goal[a.key])}）`);
-      L.push(`  意図：${dv > 0 ? (a.bUp || a.up) : (a.bDown || a.down)}`);
-      if (a.engine === "pixel") L.push(`  画像処理：${OPS[a.key](dv)}`);
-    });
-    const keep = AXES.filter(a => d[a.key] === 0).map(a => a.name);
-    if (keep.length){ L.push(""); L.push(`【動かさない項目】${keep.join("、")}`); }
-  }
-  L.push("");
-  L.push(`【生成AIへの一文】`);
-  L.push(promptLine(moved, d));
-  $("brief").value = L.join("\n");
-}
-
-function promptLine(moved, d){
-  if (!moved.length) return "この画像の印象を保ったまま再現する。";
-  const parts = moved.map(a => (d[a.key] > 0 ? (a.bUp || a.up) : (a.bDown || a.down)));
-  return `この画像の被写体・構図・用途は変えずに、${parts.join("、")}。他の感性項目は現状のまま維持すること。`;
-}
-
 /* ── 派生案 ── */
 const VARIANTS = 8;
-function drawVariants(){
-  const box = $("variants");
-  const { w, h, data } = state.src;
-  const tw = 150, th = Math.max(1, Math.round(h * tw / w));
-  const small = document.createElement("canvas");
-  small.width = tw; small.height = th;
-  const sctx = small.getContext("2d", { willReadFrequently:true });
-  const full = document.createElement("canvas");
-  full.width = w; full.height = h;
-  full.getContext("2d").putImageData(new ImageData(new Uint8ClampedArray(data), w, h), 0, 0);
-  sctx.drawImage(full, 0, 0, tw, th);
-  const base = sctx.getImageData(0, 0, tw, th).data;
-
-  box.innerHTML = "";
-  const rnd = rand(97);
-  for (let v = 0; v < VARIANTS; v++){
-    const g = { ...state.goal };
-    const picks = PIXEL_KEYS.slice().sort(() => rnd() - .5).slice(0, 2);
-    picks.forEach(k => {
-      const step = rnd() < .5 ? -1 : 1;
-      g[k] = snap(g[k] + step * (rnd() < .35 ? 1 : STEP));
-    });
-    const dv = Object.fromEntries(AXES.map(a => [a.key, g[a.key] - state.now[a.key]]));
-    const px = renderPixels(base, tw, th, dv);
-    const btn = document.createElement("button");
-    btn.className = "variant"; btn.type = "button";
-    const c = document.createElement("canvas");
-    c.width = tw; c.height = th;
-    c.getContext("2d").putImageData(new ImageData(px, tw, th), 0, 0);
-    const label = picks.map(k => {
-      const diff = g[k] - state.goal[k];
-      return diff === 0 ? "" : `${AX[k].name}${fmtd(diff)}`;
-    }).filter(Boolean).join(" ") || "微差";
-    btn.appendChild(c);
-    const cap = document.createElement("span");
-    cap.textContent = label;
-    btn.appendChild(cap);
-    btn.title = `目標に採用：${label}`;
-    btn.addEventListener("click", () => { state.goal = g; drawAll(); });
-    box.appendChild(btn);
-  }
-}
-
 /* ── まとめて更新 ── */
 function drawAll(){
   syncAxes();
-  drawRadar();
-  buildOutput();
-  clearTimeout(renderTimer);
-  if (state.tab === "research")drawMap();
-  if (state.tab === "concept"){ drawMap(); drawAdvice(); }
-  if (state.tab === "eval"){ drawChecks(); drawSaved(); }
-  if (state.tab === "visual"){
-    if (state.vis === "3d") render3D();
-    else { drawViewport(); renderTimer = setTimeout(drawVariants, 90); }
-  }
+  if (state.tab === "map"){ drawMap(); drawAdvice(); }
 }
 
 /* ============================================================
@@ -1865,8 +1584,7 @@ function ensureChairCorpus(){
     clusterItems(items);
     state.corpus.chair = items;
     state.chairLoading = false;
-    if (state.tab === "research")drawMap();
-    if (state.tab === "concept"){ drawMap(); drawAdvice(); }
+    if (state.tab === "map"){ drawMap(); drawAdvice(); }
   };
   CHAIRS.forEach((c, i) => {
     const img = new Image();
@@ -1937,7 +1655,7 @@ function fitMapSize(svg){
   const r = host.getBoundingClientRect();
   if (r.width < 80 || r.height < 80) return;
   MAP_W = Math.round(r.width); MAP_H = Math.round(r.height);
-  const panel = state.tab === "concept" && $("concept-panel");
+  const panel = $("concept-panel");
   const pw = panel && panel.offsetParent ? panel.getBoundingClientRect().width + 24 : 0;
   // 目盛と軸名がある左と下だけ余白を取り、上と右は端まで使う。
   // 浮かせたカードの下は地図が続いている（Googleマップと同じ扱い）。
@@ -1965,8 +1683,7 @@ function fillAxisSelects(){
   $("map-x").value = "form"; $("map-y").value = "color"; $("map-z").value = "-";
 }
 function mapAxes(){
-  // 調査とコンセプトは同じ軸を使う。コンセプトは平面なので先頭の2つだけ。
-  if (state.tab === "concept")
+  if (state.dim !== "3d")
     return [...new Set([$("map-x").value, $("map-y").value].filter(k => k && k !== "-"))];
   if ($("map-y").value === "-") $("map-z").value = "-";
   $("map-z").disabled = $("map-y").value === "-";
@@ -2133,8 +1850,6 @@ function drawMap(){
   const items = visibleCorpus();
   const ks = mapAxes();
   const svg = $("map");
-  const slot = $(state.tab === "concept" ? "cmap-slot" : "maprow");
-  if (slot && svg.parentNode !== slot) slot.insertBefore(svg, slot.firstChild);
   if (!svg.dataset.ready){
     svg.insertAdjacentHTML("afterbegin",
       `<defs><clipPath id="map-clip"><rect x="${PAD.L}" y="${PAD.T}" `
@@ -2155,8 +1870,7 @@ function drawMap(){
   fitMapSize(svg);
   svg.querySelector("#map-layer").innerHTML =
     ks.length >= 3 ? mapScene3D(ks, items) : mapScene2D(ks, items);
-  svg.querySelector("#map-grid").innerHTML =
-    state.tab === "concept" && ks.length === 2 ? conceptOverlay(items) : "";
+  svg.querySelector("#map-grid").innerHTML = ks.length === 2 ? conceptOverlay(items) : "";
   mapPreview(null);
 
   refreshAxisLabels();
@@ -2473,8 +2187,9 @@ function clusterMarks(items, xk, yk, px, py, box, paper, ink3, avoid){
 
 /* 軸の見出し：中央に項目名、両端に意味 */
 /* 軸名は押せる。押すと項目を選び直すダイアログが開く */
-const AXTAP_H = 44;
+const AXTAP_H = 40;
 function axisTap(cx, cy, name, which, ink, rot, muted){
+  ink = "#fff";                       // 青地の上なので、文字も矢印も白で通す
   const w = name.length * 18 + 74, h = AXTAP_H;
   const x = cx - w / 2, y = cy - h / 2;
   return `<g class="axtap${muted ? " muted" : ""}" data-ax="${which}" role="button" tabindex="0" `
@@ -2592,7 +2307,7 @@ function bindMap(svg){
     if (state.mapDragged) return;
     const tap = e.target.closest(".axtap");
     if (tap){ openAxisModal(tap.dataset.ax); return; }
-    if (state.tab === "concept" && state.mapProj && mapAxes().length === 2){
+    if (state.mapProj && mapAxes().length === 2){
       const [sx, sy] = toSvg(e), P = state.mapProj;
       const clamp = v => Math.max(1, Math.min(5, v));
       pickRegion(clamp(P.vx(sx)), clamp(P.vy(sy)));
@@ -2725,22 +2440,18 @@ function conceptOverlay(items){
     const cx0 = sel.x ? P.px(sel.x.lo) : P.x0, cx1 = sel.x ? P.px(sel.x.hi) : P.x1;
     const cy0 = sel.y ? P.py(sel.y.hi) : P.y0, cy1 = sel.y ? P.py(sel.y.lo) : P.y1;
     s += `<rect x="${cx0.toFixed(1)}" y="${cy0.toFixed(1)}" width="${(cx1-cx0).toFixed(1)}" `
-      + `height="${(cy1-cy0).toFixed(1)}" fill="${goal}" fill-opacity=".10" `
-      + `stroke="${goal}" stroke-width="2.5"/>`;
+      + `height="${(cy1-cy0).toFixed(1)}" fill="${goal}" fill-opacity=".07"/>`;
   }
 
-  // 生成した姿を、狙う位置に置く
-  const gi = state.genImage;
-  if (gi && gi.xk === xk && gi.yk === yk){
-    const ix = P.px(gi.cx == null ? mxv : gi.cx), iy = P.py(gi.cy == null ? myv : gi.cy);
+  // 描いた姿は消さずに、それぞれの狙った位置へ置いたままにする
+  state.gallery.filter(g => g.xk === xk && g.yk === yk).forEach(g => {
+    const ix = P.px(g.cx == null ? mxv : g.cx), iy = P.py(g.cy == null ? myv : g.cy);
     const S = Math.max(64, Math.min(180, state.thumb * 2.2)), h2 = S / 2;
     s += `<rect x="${(ix - h2).toFixed(1)}" y="${(iy - h2).toFixed(1)}" width="${S}" height="${S}" `
       + `rx="${(S * .07).toFixed(1)}" fill="${paper}" filter="url(#thumb-sh)"/>`
-      + `<image href="${gi.url}" x="${(ix - h2).toFixed(1)}" y="${(iy - h2).toFixed(1)}" `
-      + `width="${S}" height="${S}" preserveAspectRatio="xMidYMid slice" clip-path="url(#gen-clip)"/>`
-      + `<rect x="${(ix - h2).toFixed(1)}" y="${(iy - h2).toFixed(1)}" width="${S}" height="${S}" `
-      + `rx="${(S * .07).toFixed(1)}" fill="none" stroke="${goal}" stroke-width="2.5"/>`;
-  }
+      + `<image href="${g.url}" x="${(ix - h2).toFixed(1)}" y="${(iy - h2).toFixed(1)}" `
+      + `width="${S}" height="${S}" preserveAspectRatio="xMidYMid slice" clip-path="url(#gen-clip)"/>`;
+  });
 
   // 重心 → 狙う領域
   if (sel){
@@ -2791,12 +2502,11 @@ function conceptNote(sel, n0, mxv, myv){
     view.hidden = !rows.length;
     $("sidegen").hidden = !rows.length;
     if (rows.length){
-      const keep = state.genImage && state.genImage.xk === rows[0][1];
-      if (!keep){ $("side-img").hidden = true; $("side3d").hidden = false; }
+      const has = !!state.genImage;
+      $("side-img").hidden = !has;
+      $("side-empty").hidden = has;
       $("sidegen").hidden = false;
       $("side-gen-note").textContent = "";
-      render3D($("side3d"));
-      $("side3d-badge").textContent = rows.map(([, k, r]) => `${AX[k].name} ${fmt(r.c)}`).join(" ／ ");
     }
   }
 }
@@ -2805,13 +2515,36 @@ function conceptNote(sel, n0, mxv, myv){
 function poleWord(a, v){
   return Math.abs(v - 3) < .5 ? "どちらでもない" : v > 3 ? (a.high || "高") : (a.low || "低");
 }
+/* 軸の両極を、店頭に並んだときの呼び名に言い換える */
+const NICK = {
+  atmos:  { low:["カーム", "クワイエット", "ミューテッド"], high:["ヴィヴィッド", "ライヴリー", "ブライト"] },
+  image:  { low:["クラシック", "ヘリテージ", "トラッド"],   high:["モダン", "ニュー", "コンテンポラリー"] },
+  color:  { low:["ペール", "ミスト", "ソフト"],             high:["ビビッド", "プライム", "クロマ"] },
+  fit:    { low:["フリー", "オープン", "ルーズ"],           high:["ラップ", "エンブレース", "コンフォート"] },
+  form:   { low:["オーナメント", "デコール", "クラフト"],   high:["ピュア", "ミニマル", "エッセンシャル"] },
+  func:   { low:["シンプル", "ワンタッチ", "ベーシック"],   high:["マルチ", "スマート", "オールラウンド"] },
+  matter: { low:["スムース", "クリア", "シームレス"],       high:["テクスチャ", "ナチュラル", "グレイン"] },
+  combi:  { low:["スタンダード", "オーソドックス", "レギュラー"], high:["ハイブリッド", "ミックス", "クロス"] },
+  surp:   { low:["オネスト", "プレーン", "ストレート"],     high:["トゥイスト", "サプライズ", "アクセント"] }
+};
+const SERIES = ["I", "II", "III", "S", "R", "X", "Air", "One", "Neo", "Edge"];
+function nick(k, high, d){
+  const g = NICK[k]; if (!g) return high ? (AX[k].high || "高") : (AX[k].low || "低");
+  const a = high ? g.high : g.low;
+  // 振り幅が大きいほど、後ろの強い言葉を選ぶ
+  return a[Math.min(a.length - 1, Math.max(0, Math.round(d) - 1))];
+}
 function regionTitle(rows){
   const id = state.preset || "chair", p = PRESETS.find(x => x.id === id);
-  // 市場の重心から見てどちらへ動くかで名づける
-  const w = rows.filter(([, , r, m]) => Math.abs(r.c - m) >= .4)
-    .map(([, k, r, m]) => r.c - m > 0 ? (AX[k].high || "高") : (AX[k].low || "低"));
-  if (!w.length) return `市場の真ん中をいく${p ? p.name : "案"}`;
-  return `${w.join("　×　")}　の${p ? p.name : "案"}`;
+  const kind = p ? p.name : "案";
+  // 重心から離れた軸だけを、商品名の語として拾う
+  const mv = rows.filter(([, , r, m]) => Math.abs(r.c - m) >= .4);
+  if (!mv.length) return `<span>ミッドレンジ</span> ${kind}`;
+  const w = mv.map(([, k, r, m]) => nick(k, r.c - m > 0, Math.abs(r.c - m)));
+  // 振り幅の合計で、末尾のシリーズ記号を決める（同じ狙いなら同じ名が出る）
+  const sum = mv.reduce((a, [, , r, m]) => a + Math.abs(r.c - m), 0);
+  const tag = SERIES[Math.round(sum * 2) % SERIES.length];
+  return `<span>${w.join(" ")} ${kind} ${tag}</span>`;
 }
 
 /* 数値を使わずに、狙いを言葉で言い直す */
@@ -2841,7 +2574,6 @@ function pickRegion(vx, vy){
   const mk = v => { const c = snap(v); return { lo:Math.max(1, c - half), hi:Math.min(5, c + half), c }; };
   state.region = { xk, yk, x: mk(vx), y: mk(vy) };
   applyRegion();
-  state.genImage = null;
   drawAll();
   queueSideGen();
 }
@@ -3209,80 +2941,13 @@ function marketMean(){
 }
 const profDist = (p, q) => Math.sqrt(AXES.reduce((s2, a) => s2 + (p[a.key] - q[a.key]) ** 2, 0));
 
-function drawChecks(){
-  const d = deltas(), id = state.preset || "chair", ctx = CONTEXT[id] || CONTEXT.chair;
-  const moved = AXES.filter(a => d[a.key] !== 0);
-  const mean = marketMean();
-  const dNow = profDist(state.now, mean), dGoal = profDist(state.goal, mean);
-  const ranked = Object.entries(ctx.w).sort((a, b) => b[1] - a[1]).slice(0, 2).map(e => e[0]);
-  const hitTop = ranked.filter(k => d[k] > 0);
-  const banned = Object.keys(ctx.taboo || {}).filter(k => d[k] > 0);
-  const structural = moved.filter(a => a.engine === "brief").length;
-
-  const rows = [
-    banned.length
-      ? ["ng", `禁忌項目を上げている：${banned.map(k => AX[k].name).join("・")}。${ctx.taboo[banned[0]]}`]
-      : ["ok", "用途文脈で上げてはいけない項目には触れていない。"],
-    hitTop.length
-      ? ["ok", `この用途で重要な「${hitTop.map(k => AX[k].name).join("・")}」を伸ばしている。`]
-      : ["warn", `重要度上位の「${ranked.map(k => AX[k].name).join("・")}」が動いていない。効きの弱い項目だけを触っていないか。`],
-    moved.length === 0 ? ["warn", "差分がない。現状維持の案。"]
-      : moved.length <= 3 ? ["ok", `動かす項目は${moved.length}件。焦点が絞れている。`]
-      : ["warn", `動かす項目が${moved.length}件。多すぎると何のデザインか読めなくなる。3件までを目安に。`],
-    dGoal > dNow + .3
-      ? ["ok", `市場平均からの距離が ${dNow.toFixed(1)} → ${dGoal.toFixed(1)} に広がる。差別化の方向。`]
-      : dGoal < dNow - .3
-      ? ["warn", `市場平均に ${dNow.toFixed(1)} → ${dGoal.toFixed(1)} と近づく。埋没する方向。意図的か確認。`]
-      : ["warn", `市場平均との距離がほぼ変わらない（${dNow.toFixed(1)} → ${dGoal.toFixed(1)}）。`],
-    structural
-      ? ["ok", `構造項目を${structural}件含む。画像処理だけで終わらない案になっている。`]
-      : ["warn", "動かしているのが画像で表現できる項目だけ。見た目の調整に留まっていないか。"]
-  ];
-  $("checks").innerHTML = rows.map(([k, t]) =>
-    `<li class="${k}"><span class="mk">${icon(k === "ok" ? "check_circle" : k === "warn" ? "warning" : "cancel")}</span><span>${t}</span></li>`).join("");
-}
-
-function drawSaved(){
-  const box = $("saved");
-  if (!state.cands.length){ box.innerHTML = `<li class="empty">まだ記録がありません。</li>`; return; }
-  box.innerHTML = "";
-  state.cands.forEach((c, i) => {
-    const li = document.createElement("li");
-    li.innerHTML = `<b>${c.title}</b><em>${c.summary}</em>`;
-    const load = document.createElement("button");
-    load.className = "btn mini"; load.textContent = "呼び出す";
-    load.addEventListener("click", () => {
-      if (c.preset && c.preset !== state.preset) usePreset(c.preset);
-      state.now = { ...c.now }; state.goal = { ...c.goal };
-      drawAll();
-    });
-    const del = document.createElement("button");
-    del.className = "btn mini"; del.textContent = "削除";
-    del.addEventListener("click", () => { state.cands.splice(i, 1); drawSaved(); });
-    li.append(load, del);
-    box.appendChild(li);
-  });
-}
-
 /* ── タブ ── */
 function setTab(t){
   state.tab = t;
   document.querySelectorAll(".tab").forEach(b => b.setAttribute("aria-selected", b.dataset.tab === t));
-  ["research", "concept", "visual", "eval", "settings"].forEach(k => $("pane-" + k).classList.toggle("on", k === t));
-  document.querySelector(".deck").classList.toggle("no-rail",
-    t === "research" || t === "concept" || t === "settings");
+  ["map", "settings"].forEach(k => $("pane-" + k).classList.toggle("on", k === t));
   drawAll();
 }
-function setVis(m){
-  state.vis = m;
-  ["3d", "img", "gen"].forEach(k => {
-    $("vis-" + k).setAttribute("aria-pressed", String(m === k));
-    $("stage-" + k).hidden = m !== k;
-  });
-  if (m === "gen") $("gen-prompt").value = genPrompt();
-  drawAll();
-}
-
 /* ── 操作 ── */
 function setMode(m){
   state.mode = m;
@@ -3296,47 +2961,6 @@ function setMode(m){
 $("mode-now").addEventListener("click", () => setMode("now"));
 $("mode-goal").addEventListener("click", () => setMode("goal"));
 
-$("wipe").addEventListener("input", e => {
-  state.wipe = +e.target.value;
-  $("wipe-val").textContent = state.wipe + "%";
-  drawViewport();
-});
-
-$("btn-copy").addEventListener("click", async () => {
-  const btn = $("btn-copy");
-  try { await navigator.clipboard.writeText($("brief").value); btn.textContent = "コピーしました"; }
-  catch { $("brief").select(); btn.textContent = "選択しました。手動でコピーしてください"; }
-  setTimeout(() => btn.textContent = "指示書をコピー", 1800);
-});
-
-$("btn-json").addEventListener("click", () => {
-  const d = deltas();
-  const payload = {
-    framework: "感性デザイン9項目（山岡俊樹）",
-    target: state.label,
-    profile: AXES.map(a => ({
-      no:a.no, name:a.name, engine:a.engine,
-      now:state.now[a.key], goal:state.goal[a.key], delta:d[a.key],
-      operation: d[a.key] === 0 ? null : (a.engine === "pixel" ? OPS[a.key](d[a.key]) : (d[a.key] > 0 ? a.bUp : a.bDown))
-    })),
-    prompt: promptLine(AXES.filter(a => d[a.key] !== 0), d)
-  };
-  const blob = new Blob([JSON.stringify(payload, null, 2)], { type:"application/json" });
-  const a = document.createElement("a");
-  a.download = "kansei-recipe.json"; a.href = URL.createObjectURL(blob); a.click();
-  setTimeout(() => URL.revokeObjectURL(a.href), 4000);
-});
-
-/* ドラッグ＆ドロップ／貼り付け */
-const dz = $("dropzone"), vp = $("viewport");
-["dragenter", "dragover"].forEach(t => vp.addEventListener(t, e => { e.preventDefault(); dz.classList.add("on"); }));
-["dragleave", "drop"].forEach(t => vp.addEventListener(t, e => { e.preventDefault(); dz.classList.remove("on"); }));
-vp.addEventListener("drop", e => { if (e.dataTransfer.files[0]) loadFile(e.dataTransfer.files[0]); });
-window.addEventListener("paste", e => {
-  const item = [...(e.clipboardData?.items || [])].find(i => i.type.startsWith("image/"));
-  if (item) loadFile(item.getAsFile());
-});
-
 
 /* ============================================================
    AI画像生成（任意）─ Gemini の画像モデル「Nano Banana」
@@ -3348,50 +2972,7 @@ window.addEventListener("paste", e => {
 const GEN_KEY_STORE = "kansei-morph.gemini-key";
 
 /* 9項目の差分を、絵として何をどう変えるかの指示に直す */
-function genPrompt(){
-  const id = state.preset || "chair", ctx = CONTEXT[id] || CONTEXT.chair;
-  const p = PRESETS.find(x => x.id === id);
-  const d = deltas();
-  const moved = AXES.filter(a => d[a.key] !== 0);
-  const L = [];
-  L.push(`この写真の${p ? p.name : "製品"}を、被写体・構図・画角・背景の構成は変えずに、次の方向へ描き直してください。`);
-  L.push(`用途文脈：${p ? p.context : ""}`);
-  L.push("");
-  L.push("【変える項目（山岡俊樹の感性デザイン9項目・1〜5）】");
-  if (moved.length){
-    moved.forEach(a => {
-      const to = state.goal[a.key], from = state.now[a.key];
-      L.push(`・${a.name}：${fmt(from)} → ${fmt(to)}（${fmtd(d[a.key])}）／${d[a.key] > 0 ? (a.bUp || a.up) : (a.bDown || a.down)}`);
-    });
-  } else L.push("・差分なし（現状を維持）");
-  L.push("");
-  L.push("【変えない項目】");
-  const keep = AXES.filter(a => d[a.key] === 0).map(a => a.name);
-  L.push(keep.length ? `・${keep.join("、")} は現状のまま維持` : "・なし");
-  const taboo = Object.keys(ctx.taboo || {});
-  if (taboo.length){
-    L.push("");
-    L.push("【禁止】");
-    taboo.forEach(k => L.push(`・${AX[k].name}を上げない：${ctx.taboo[k]}`));
-  }
-  L.push("");
-  L.push("出力は画像1枚だけ。文字・ロゴ・透かしは入れないこと。実在の商品名やブランドは想起させないこと。");
-  return L.join("\n");
-}
-
 /* 生成のもとにする画像（画像改変の結果 → なければ3Dの見え方） */
-function genSourceJPEG(){
-  if (processed && state.src){
-    const { w, h } = state.src;
-    const c = document.createElement("canvas");
-    c.width = w; c.height = h;
-    c.getContext("2d").putImageData(new ImageData(new Uint8ClampedArray(processed), w, h), 0, 0);
-    return [c.toDataURL("image/jpeg", .9).split(",")[1], "image/jpeg"];
-  }
-  const cv = $("three");
-  return [cv.toDataURL("image/jpeg", .9).split(",")[1], "image/jpeg"];
-}
-
 /* 生成の実体。画面のどこから呼んでも同じ経路を通る。 */
 const genImage = (key, model, prompt, data, mime) =>
   genImageMulti(key, model, prompt, [{ mime_type:mime, data }]);
@@ -3428,30 +3009,75 @@ async function genImageMulti(key, model, prompt, imgs, square){
   const inl = img.inlineData || img.inline_data;
   return { url: `data:${inl.mimeType || inl.mime_type || "image/png"};base64,${inl.data}` };
 }
-const GEN_OFFLINE = "外部への通信ができませんでした。公開ページでは遮断されています。ローカルで index.html を開いて試してください。";
-
-async function runNanoBanana(){
-  const key = ($("gen-key").value || "").trim();
-  const btn = $("gen-run"), note = $("gen-note"), badge = $("gen-badge");
-  if (!key){ note.textContent = "APIキーを入れてください。"; $("gen-key").focus(); return; }
-  const model = $("gen-model").value;
-  btn.disabled = true; badge.textContent = "生成中…"; note.textContent = "";
-  try {
-    const [data, mime] = genSourceJPEG();
-    const r = await genImage(key, model, $("gen-prompt").value || genPrompt(), data, mime);
-    if (r.error){ note.textContent = r.error; badge.textContent = "生成できませんでした"; return; }
-    $("gen-img").src = r.url; $("gen-img").hidden = false;
-    badge.textContent = `${model}／${moveSummary()}`;
-    note.textContent = "画像を右クリックで保存できます。指示文を書き換えてもう一度押せば描き直せます。";
-  } catch (e) {
-    badge.textContent = "生成できませんでした"; note.textContent = GEN_OFFLINE;
-  } finally { btn.disabled = false; }
+/* ── 5×5の25通りを一気に描く ──
+   両軸を1〜5で刻み、升目の中央それぞれを狙いとして描き、地図に並べる。
+   一度に投げると断られやすいので、少しずつ流す。もう一度押すと止まる。 */
+const GRID_AT = [1, 2, 3, 4, 5];
+const GRID_REFS = 2;      // 手本を絞ると、送る量が減って戻りが早い
+let gridRun = null;
+const gridLanes = () => Math.max(1, +(($("gen-lanes") || {}).value || 8));
+function gridCells(){
+  const [xk, yk] = conceptAxes();
+  const half = 2 / CONCEPT_N;
+  const mk = v => ({ lo:Math.max(1, v - half), hi:Math.min(5, v + half), c:v });
+  const out = [];
+  GRID_AT.forEach(yv => GRID_AT.forEach(xv =>
+    out.push({ xk, yk, x:mk(xv), y:mk(yv) })));
+  return out;
 }
+async function runGridGen(){
+  const btn = $("grid-gen"), note = $("grid-note");
+  if (gridRun){ gridRun.stop = true; return; }         // 走っている最中なら止める
+  const key = (localStorage.getItem(GEN_KEY_STORE) || "").trim();
+  if (!key){
+    note.textContent = "設定タブで Gemini のAPIキーを入れてください。";
+    setTab("settings"); $("gen-key").focus();
+    return;
+  }
+  const dir = ($("side-dir") ? ($("side-dir").value || "").trim() : "");
+  const all = gridCells();
+  const cells = all.filter(c => !state.gallery.some(g =>
+    g.xk === c.xk && g.yk === c.yk && g.cx === c.x.c && g.cy === c.y.c));
+  if (!cells.length){
+    note.textContent = "25枚とも描き終わっています。描き直すには、その升目を押してから描き直してください。";
+    return;
+  }
+  const run = gridRun = { stop:false, done:0, ng:0 };
+  setBtn(btn, "cancel", "止める");
+  const tick = () => {
+    note.textContent = run.stop ? `止めました（${run.done}/${cells.length}枚）`
+      : `描いています… ${run.done}/${cells.length}枚` + (run.ng ? `／${run.ng}枚は描けませんでした` : "");
+  };
+  tick();
+  let next = 0;
+  const lane = async () => {
+    while (!run.stop && next < cells.length){
+      const rg = cells[next++];
+      const r = await drawOne(key, rg, dir, GRID_REFS).catch(() => ({ error:GEN_OFFLINE }));
+      if (run.stop) return;
+      if (r.error) run.ng++; else { keepImage(r.url, rg); drawMap(); }
+      run.done++; tick();
+    }
+  };
+  try { await Promise.all(Array.from({ length:Math.min(gridLanes(), cells.length) }, lane)); }
+  finally {
+    if (gridRun === run){
+      gridRun = null;
+      setBtn(btn, "grid_on", "5×5の25通りを一気に描く");
+      tick();
+      if (!run.stop) note.textContent = run.ng
+        ? `${cells.length}枚のうち ${run.done - run.ng}枚を地図に並べました（${run.ng}枚は描けませんでした）。`
+        : `${cells.length}枚を地図に並べました。`;
+      drawMap();
+    }
+  }
+}
+const GEN_OFFLINE = "外部への通信ができませんでした。公開ページでは遮断されています。ローカルで index.html を開いて試してください。";
 
 /* コンセプトの側面：狙う位置に近い実物の写真を参考にして描かせる。
    簡略化した立体ではなく、同じ市場に実在する写真を手本にする。 */
-function sideRefs(n){
-  const r = state.region; if (!r) return [];
+function sideRefs(n, rg){
+  const r = rg || state.region; if (!r) return [];
   const [xk, yk] = conceptAxes();
   const tx = r.x ? r.x.c : 3, ty = r.y ? r.y.c : 3;
   return visibleCorpus()
@@ -3462,8 +3088,8 @@ function sideRefs(n){
     .slice(0, n)
     .map(e => e.it);
 }
-function sideGenPrompt(refs){
-  const id = state.preset || "chair", p = PRESETS.find(x => x.id === id), r = state.region;
+function sideGenPrompt(refs, dir, rg){
+  const id = state.preset || "chair", p = PRESETS.find(x => x.id === id), r = rg || state.region;
   const [xk, yk] = conceptAxes();
   const L = [];
   if (refs.length){
@@ -3496,6 +3122,11 @@ function sideGenPrompt(refs){
     });
   }
   L.push("");
+  if (dir){
+    L.push("");
+    L.push("【追加の指示】" + dir);
+  }
+  L.push("");
   L.push("出力は画像1枚だけ。文字・ロゴ・透かしは入れないこと。実在の商品名やブランドは想起させないこと。");
   return L.join("\n");
 }
@@ -3504,6 +3135,22 @@ function refBase64(it){
   if (!c) return null;
   const m = /^data:(image\/[a-z+]+);base64,(.+)$/.exec(c.src);
   return m ? { mime_type:m[1], data:m[2] } : null;
+}
+/* 位置をひとつ渡して、その狙いの姿を1枚描く。側面にも一覧にも同じ道を使う。 */
+async function drawOne(key, rg, dir, nref){
+  const refs = sideRefs(nref || 3, rg);
+  const imgs = refs.map(refBase64).filter(Boolean);
+  if (!imgs.length) return { error:"この対象には手本にできる写真がありません。" };
+  return genImageMulti(key, $("gen-model").value, sideGenPrompt(refs, dir, rg), imgs, true);
+}
+/* 描いた姿を地図に足す。同じ位置を描き直したときだけ差し替える。 */
+function keepImage(url, rg){
+  const g = { url, xk:rg.xk, yk:rg.yk,
+              cx: rg.x ? rg.x.c : null, cy: rg.y ? rg.y.c : null };
+  const i = state.gallery.findIndex(o => o.xk === g.xk && o.yk === g.yk
+    && o.cx === g.cx && o.cy === g.cy);
+  if (i >= 0) state.gallery[i] = g; else state.gallery.push(g);
+  return g;
 }
 /* 目標を置くたびに自動で走る。連打しても最後の一回だけ投げる。 */
 let sideGenTimer = 0, sideGenSeq = 0;
@@ -3526,147 +3173,32 @@ async function runSideGen(){
   const seq = ++sideGenSeq;
   btn.disabled = true; spin.hidden = false; note.textContent = "描いています…";
   try {
-    const refs = sideRefs(3);
-    const imgs = refs.map(refBase64).filter(Boolean);
-    const parts = imgs.length
-      ? imgs
-      : [{ mime_type:"image/jpeg", data:$("side3d").toDataURL("image/jpeg", .9).split(",")[1] }];
-    const r = await genImageMulti(key, $("gen-model").value,
-      sideGenPrompt(imgs.length ? refs : []), parts, true);
+    const rg = state.region;
+    const r = await drawOne(key, rg, ($("side-dir").value || "").trim());
     if (seq !== sideGenSeq) return;                   // 追い越された結果は捨てる
     if (r.error){ note.textContent = r.error; return; }
     $("side-img").src = r.url;
-    $("side-img").hidden = false; $("side3d").hidden = true;
-    const rg = state.region;
-    state.genImage = { url:r.url, xk:rg.xk, yk:rg.yk,
-                       cx: rg.x ? rg.x.c : null, cy: rg.y ? rg.y.c : null };
+    $("side-img").hidden = false; $("side-empty").hidden = true;
+    state.genImage = keepImage(r.url, rg);
     drawMap();
-    note.textContent = imgs.length
-      ? `狙う位置に近い実物 ${imgs.length}点（${refs.map(it => it.name).join("・")}）を手本にしています。`
-      : "この対象には実写サンプルがないので、立体をもとに描いています。";
+    note.textContent = "";
   } catch (e) {
     if (seq === sideGenSeq) note.textContent = GEN_OFFLINE;
   } finally {
     if (seq === sideGenSeq){ btn.disabled = false; spin.hidden = true; }
   }
 }
-function moveSummary(){
-  const d = deltas(), moved = AXES.filter(a => d[a.key] !== 0);
-  return moved.length ? moved.map(a => `${a.name}${fmtd(d[a.key])}`).join(" ") : "差分なし";
-}
-
 /* ============================================================
    AI講評（任意）
    APIキーは利用者が実行時に入力し、このブラウザの localStorage にのみ置く。
    ソースにもリポジトリにも書かない。公開ページは外部通信が禁じられているため、
    ローカルで開いたときだけ動く。
    ============================================================ */
-const AI_KEY_STORE = "kansei-morph.anthropic-key";
 
 /* いま見えている可視化を JPEG にする */
-function currentViewJPEG(){
-  let cv;
-  if (state.tab === "visual" && state.vis === "3d") cv = $("three");
-  else {
-    if (!processed) drawViewport();
-    const { w, h } = state.src;
-    cv = document.createElement("canvas");
-    cv.width = w; cv.height = h;
-    cv.getContext("2d").putImageData(new ImageData(new Uint8ClampedArray(processed), w, h), 0, 0);
-  }
-  const k = Math.min(1, 1200 / Math.max(cv.width, cv.height));
-  const t = document.createElement("canvas");
-  t.width = Math.max(1, Math.round(cv.width * k));
-  t.height = Math.max(1, Math.round(cv.height * k));
-  t.getContext("2d").drawImage(cv, 0, 0, t.width, t.height);
-  return t.toDataURL("image/jpeg", .85).split(",")[1];
-}
-
-function aiPrompt(){
-  const d = deltas(), id = state.preset || "chair";
-  const p = PRESETS.find(x => x.id === id), ctx = CONTEXT[id] || CONTEXT.chair;
-  const items = visibleCorpus();
-  const mean = k => items.length ? items.reduce((t, it) => t + it.p[k], 0) / items.length : 3;
-  const L = [];
-  L.push(`対象：${p ? p.name : id}（${p ? p.context : ""}）`);
-  L.push(`用途文脈での重要度：${Object.entries(ctx.w).sort((a, b) => b[1] - a[1])
-    .map(([k, v]) => `${AX[k].name} ${v.toFixed(2)}`).join(" / ")}`);
-  const ban = Object.keys(ctx.taboo || {});
-  if (ban.length) L.push(`上げてはいけない項目：${ban.map(k => `${AX[k].name}（${ctx.taboo[k]}）`).join(" / ")}`);
-  L.push("");
-  L.push("【感性デザイン9項目（山岡俊樹）1〜5・0.5刻み】");
-  AXES.forEach(a => L.push(`・${a.name}：現状 ${fmt(state.now[a.key])} → 目標 ${fmt(state.goal[a.key])}`
-    + `（${d[a.key] === 0 ? "±0" : fmtd(d[a.key])}）／市場平均 ${mean(a.key).toFixed(1)}`
-    + `／${a.engine === "pixel" ? "画像で表現できる項目" : "構造の項目（画像では表せない）"}`));
-  L.push("");
-  L.push(`市場コーパス：${items.length}件（${[...new Set(items.map(it => it.cat))].join("、")}）`);
-  if (state.region){
-    const r = state.region;
-    const seg = [[r.xk, r.x], [r.yk, r.y]].filter(e => e[1])
-      .map(([k, e]) => `${AX[k].name} ${fmt(e.lo)}〜${fmt(e.hi)}`);
-    if (seg.length) L.push(`狙う領域：${seg.join("／")}`);
-  }
-  L.push("");
-  L.push("【設計指示書】");
-  L.push($("brief").value);
-  L.push("");
-  L.push("添付画像は" + (state.tab === "visual" && state.vis === "3d"
-    ? "目標プロファイルを反映した3D形状（概略モデル）" : "目標プロファイルで改変した画像") + "です。");
-  L.push("次の3点を、それぞれ3〜5行で日本語でお願いします。前置きは不要です。");
-  L.push("1. この改変案は用途文脈に対して妥当か（画像と数値の両方を根拠に）");
-  L.push("2. 見落としている項目・矛盾している項目");
-  L.push("3. 次の一手（具体的に、1つだけ）");
-  return L.join("\n");
-}
-
-async function askClaude(){
-  const key = ($("ai-key").value || "").trim(), out = $("ai-out"), btn = $("ai-run");
-  if (!key){ out.value = "APIキーを入力してください（このブラウザにのみ保存されます）。"; return; }
-  btn.disabled = true; out.value = "Claudeに問い合わせています…";
-  try {
-    const res = await fetch("https://api.anthropic.com/v1/messages", {
-      method: "POST",
-      headers: {
-        "content-type": "application/json",
-        "x-api-key": key,
-        "anthropic-version": "2023-06-01",
-        "anthropic-dangerous-direct-browser-access": "true"
-      },
-      body: JSON.stringify({
-        model: $("ai-model").value,
-        max_tokens: 8000,
-        output_config: { effort: "medium" },
-        system: "あなたは山岡俊樹の感性デザイン9項目に通じたデザイン評価者です。"
-          + "指摘は具体的に、根拠を画像と数値に置いてください。褒め言葉や前置きは書きません。",
-        messages: [{ role: "user", content: [
-          { type: "image", source: { type: "base64", media_type: "image/jpeg", data: currentViewJPEG() } },
-          { type: "text", text: aiPrompt() }
-        ]}]
-      })
-    });
-    if (!res.ok){
-      const t = await res.text();
-      out.value = res.status === 401 ? "認証に失敗しました。APIキーを確認してください。"
-        : `エラー ${res.status}\n${t.slice(0, 800)}`;
-      return;
-    }
-    const j = await res.json();
-    if (j.stop_reason === "refusal"){ out.value = "Claudeが応答を控えました。"; return; }
-    out.value = (j.content || []).filter(b => b.type === "text").map(b => b.text).join("\n").trim()
-      || "（空の応答）";
-  } catch (e) {
-    out.value = "通信できませんでした。公開ページは外部への通信が遮断されているため、"
-      + "リポジトリの index.html をローカルで開いて実行してください。\n\n" + e;
-  } finally {
-    btn.disabled = false;
-  }
-}
-
 /* ── タブと工程の操作 ── */
 document.querySelectorAll(".tab").forEach(b =>
   b.addEventListener("click", () => setTab(b.dataset.tab)));
-$("vis-3d").addEventListener("click", () => setVis("3d"));
-$("vis-img").addEventListener("click", () => setVis("img"));
 
 ["map-x", "map-y", "map-z"].forEach(id => $(id).addEventListener("change", () => {
   state.mapView = { k:1, tx:0, ty:0 };
@@ -3681,7 +3213,7 @@ $("map").addEventListener("dblclick", mapReset);
 const AX_LABEL = { x:"横軸", y:"縦軸", z:"奥行き" };
 function axisSelectId(which){
   const id = ({ x:"map-x", y:"map-y", z:"map-z" })[which];
-  return state.tab === "concept" && which === "z" ? null : id;   // コンセプトは平面
+  return state.dim !== "3d" && which === "z" ? null : id;
 }
 function openAxisModal(which){
   const id = axisSelectId(which), sel = id && $(id);
@@ -3692,7 +3224,7 @@ function openAxisModal(which){
     "ばらつきの大きい順に並んでいます。ばらつきのある項目ほど、競合が散らばっていて違いが出る軸です。";
   // どの軸がその項目を使っているかを名指しする
   const usedBy = {};
-  (state.tab === "concept" ? ["x", "y"] : ["x", "y", "z"]).forEach(w => {
+  (state.dim === "3d" ? ["x", "y", "z"] : ["x", "y"]).forEach(w => {
     const s2 = $(axisSelectId(w));
     if (s2 && s2.value && s2.value !== "-") usedBy[s2.value] = AX_LABEL[w];
   });
@@ -3756,7 +3288,7 @@ let mapFitTimer = 0;
 window.addEventListener("resize", () => {
   clearTimeout(mapFitTimer);
   mapFitTimer = setTimeout(() => {
-    if (state.tab === "research" || state.tab === "concept") drawMap();
+    if (state.tab === "map") drawMap();
   }, 120);
 });
 $("corpus-file").addEventListener("change", e => { addImagesToCorpus(e.target.files); e.target.value = ""; });
@@ -3769,40 +3301,6 @@ $("map").addEventListener("drop", e => {
 });
 
 /* 3D の視点 */
-$("yaw").addEventListener("input", e => { state.yaw = +e.target.value; render3D(); });
-$("spin").addEventListener("change", e => { state.spin = e.target.checked; if (state.spin) tick(); });
-let dragging = null;
-const three = $("three");
-three.addEventListener("pointerdown", e => {
-  dragging = { x:e.clientX, y:e.clientY, yaw:state.yaw, pitch:state.pitch };
-  three.setPointerCapture(e.pointerId);
-});
-three.addEventListener("pointermove", e => {
-  if (!dragging) return;
-  state.yaw = dragging.yaw + (e.clientX - dragging.x) * .4;
-  state.pitch = Math.max(-45, Math.min(35, dragging.pitch - (e.clientY - dragging.y) * .3));
-  $("yaw").value = Math.max(-180, Math.min(180, state.yaw));
-  render3D();
-});
-["pointerup", "pointercancel"].forEach(t => three.addEventListener(t, () => dragging = null));
-function tick(){
-  if (!state.spin) return;
-  state.yaw = (state.yaw + .55 + 180) % 360 - 180;
-  $("yaw").value = state.yaw;
-  if (state.tab === "visual" && state.vis === "3d") render3D();
-  requestAnimationFrame(tick);
-}
-
-$("ai-key").value = localStorage.getItem(AI_KEY_STORE) || "";
-$("ai-key").addEventListener("change", e => {
-  const v = e.target.value.trim();
-  v ? localStorage.setItem(AI_KEY_STORE, v) : localStorage.removeItem(AI_KEY_STORE);
-});
-$("ai-clear").addEventListener("click", () => {
-  localStorage.removeItem(AI_KEY_STORE); $("ai-key").value = ""; $("ai-out").value = "";
-});
-$("ai-run").addEventListener("click", askClaude);
-
 $("gen-key").value = localStorage.getItem(GEN_KEY_STORE) || "";
 $("gen-key").addEventListener("change", e => {
   const v = e.target.value.trim();
@@ -3811,23 +3309,8 @@ $("gen-key").addEventListener("change", e => {
 $("gen-clear").addEventListener("click", () => {
   localStorage.removeItem(GEN_KEY_STORE); $("gen-key").value = "";
 });
-$("gen-run").addEventListener("click", runNanoBanana);
-$("vis-gen").addEventListener("click", () => setVis("gen"));
 $("side-gen").addEventListener("click", runSideGen);
-
-$("btn-save-cand").addEventListener("click", () => {
-  const d = deltas();
-  const moved = AXES.filter(a => d[a.key] !== 0);
-  const p = PRESETS.find(x => x.id === state.preset);
-  state.cands.push({
-    title: `${p ? p.name : "案"} ${state.cands.length + 1}`,
-    summary: moved.length
-      ? moved.map(a => `${a.name}${fmtd(d[a.key])}`).join(" ")
-      : "差分なし",
-    preset: state.preset, now:{ ...state.now }, goal:{ ...state.goal }
-  });
-  drawSaved();
-});
+$("grid-gen").addEventListener("click", runGridGen);
 
 /* 起動 */
 setMode("goal");
@@ -3836,7 +3319,7 @@ buildPresets();
 fillAxisSelects();
 usePreset("chair");
 setDim("2d");
-setTab("research");
+setTab("map");
 paintIcons();
 </script>
 </body>
