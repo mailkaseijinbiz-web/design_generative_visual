@@ -302,6 +302,9 @@ button{cursor:pointer}
 @keyframes spin{to{transform:rotate(360deg)}}
 @media (prefers-reduced-motion:reduce){.spin i{animation-duration:2.4s}}
 .gridgen{display:flex; gap:6px; align-items:center; flex-wrap:wrap; margin:0 0 12px}
+.genauto{display:flex; gap:8px; align-items:flex-start; font-size:12.5px; color:var(--ink-2);
+  line-height:1.6; cursor:pointer}
+.genauto input{margin-top:3px; accent-color:var(--now)}
 .gridgen .cap{flex:1 1 100%; color:var(--ink-3); font-size:11.5px; line-height:1.6}
 .sidegen{display:flex; gap:6px; align-items:center; flex-wrap:wrap; margin:0 0 12px}
 .sidegen .keyfield{flex:1 1 100%; min-width:0}
@@ -472,7 +475,12 @@ svg text{font-family:var(--font-ui)}
         </div>
         <div class="mappanel-body">
           <div class="gridgen">
-            <button class="btn mini" id="grid-gen" data-ic="grid_on">5×5の25通りを一気に描く</button>
+            <select id="grid-size" aria-label="升目の細かさ">
+              <option value="3" selected>3×3（9枚）</option>
+              <option value="4">4×4（16枚）</option>
+              <option value="5">5×5（25枚）</option>
+            </select>
+            <button class="btn mini" id="grid-gen" data-ic="grid_on">一気に描く</button>
             <span class="cap" id="grid-note"></span>
           </div>
           <div class="sideview" id="sideview" hidden>
@@ -526,6 +534,9 @@ svg text{font-family:var(--font-ui)}
             <option value="25">同時に25枚（一気に・制限に当たりやすい）</option>
           </select>
           <button class="btn mini" id="gen-clear" data-ic="delete">キーを消す</button>
+          <label class="genauto"><input type="checkbox" id="gen-auto">
+            目標を置いたら自動で描く（置くたびに画像1枚ぶんの料金がかかる）</label>
+          <p class="cap" id="gen-count-note"></p>
         </div>
       </div>
     </div>
@@ -2743,6 +2754,9 @@ function conceptNote(sel, n0, mxv, myv){
       $("side-empty").hidden = has;
       $("sidegen").hidden = false;
       $("side-gen-note").textContent = "";
+      setBtn($("side-gen"), "auto_awesome", has ? "この指示で描き直す" : "AIでこの位置を描く");
+      if (!has && !autoGenOn())
+        $("side-empty").textContent = "目標を置きました。ボタンを押すとAIがこの位置の姿を描きます（設定で自動にもできます）。";
     }
   }
 }
@@ -3278,7 +3292,7 @@ async function genImageMulti(key, model, prompt, imgs, square){
 /* ── 5×5の25通りを一気に描く ──
    両軸を1〜5で刻み、升目の中央それぞれを狙いとして描き、地図に並べる。
    一度に投げると断られやすいので、少しずつ流す。もう一度押すと止まる。 */
-const GRID_AT = [1, 2, 3, 4, 5];
+const gridAt = () => ({ 3:[1, 3, 5], 4:[1, 2.5, 3.5, 5], 5:[1, 2, 3, 4, 5] })[+(($("grid-size") || {}).value || 3)];
 const GRID_REFS = 2;      // 手本を絞ると、送る量が減って戻りが早い
 let gridRun = null;
 const gridLanes = () => Math.max(1, +(($("gen-lanes") || {}).value || 8));
@@ -3287,7 +3301,8 @@ function gridCells(){
   const half = 2 / CONCEPT_N;
   const mk = v => ({ lo:Math.max(1, v - half), hi:Math.min(5, v + half), c:v });
   const out = [];
-  GRID_AT.forEach(yv => GRID_AT.forEach(xv =>
+  const at = gridAt();
+  at.forEach(yv => at.forEach(xv =>
     out.push({ xk, yk, x:mk(xv), y:mk(yv) })));
   return out;
 }
@@ -3305,7 +3320,7 @@ async function runGridGen(){
   const cells = all.filter(c => !state.gallery.some(g =>
     g.xk === c.xk && g.yk === c.yk && g.cx === c.x.c && g.cy === c.y.c));
   if (!cells.length){
-    note.textContent = "25枚とも描き終わっています。描き直すには、その升目を押してから描き直してください。";
+    note.textContent = "この升目はすべて描き終わっています。描き直すには、その升目を押してから描き直してください。";
     return;
   }
   const run = gridRun = { stop:false, done:0, ng:0 };
@@ -3329,7 +3344,7 @@ async function runGridGen(){
   finally {
     if (gridRun === run){
       gridRun = null;
-      setBtn(btn, "grid_on", "5×5の25通りを一気に描く");
+      setBtn(btn, "grid_on", "一気に描く");
       tick();
       if (!run.stop) note.textContent = run.ng
         ? `${cells.length}枚のうち ${run.done - run.ng}枚を地図に並べました（${run.ng}枚は描けませんでした）。`
@@ -3419,8 +3434,20 @@ async function drawOne(key, rg, dir, nref){
   if (!imgs.length) return { error:"この対象には手本にできる写真がありません。" };
   return genImageMulti(key, $("gen-model").value, sideGenPrompt(refs, dir, rg), imgs, true);
 }
+/* この端末で描いた枚数を数え、概算額とともに設定に出す */
+const GEN_COUNT_STORE = "kansei-morph.gen-count";
+function bumpGenCount(){
+  localStorage.setItem(GEN_COUNT_STORE, (+localStorage.getItem(GEN_COUNT_STORE) || 0) + 1);
+  syncGenCount();
+}
+function syncGenCount(){
+  const el = $("gen-count-note"); if (!el) return;
+  const n = +localStorage.getItem(GEN_COUNT_STORE) || 0;
+  el.textContent = n ? `この端末で描いた枚数：${n}枚（目安 $${(n * .04).toFixed(2)}／Nano Banana換算）` : "";
+}
 /* 描いた姿を地図に足す。同じ位置を描き直したときだけ差し替える。 */
 function keepImage(url, rg){
+  bumpGenCount();
   const g = { url, xk:rg.xk, yk:rg.yk,
               cx: rg.x ? rg.x.c : null, cy: rg.y ? rg.y.c : null };
   const i = state.gallery.findIndex(o => o.xk === g.xk && o.yk === g.yk
@@ -3430,8 +3457,11 @@ function keepImage(url, rg){
 }
 /* 目標を置くたびに自動で走る。連打しても最後の一回だけ投げる。 */
 let sideGenTimer = 0, sideGenSeq = 0;
+const AUTOGEN_STORE = "kansei-morph.autogen";
+const autoGenOn = () => localStorage.getItem(AUTOGEN_STORE) === "1";
 function queueSideGen(){
   clearTimeout(sideGenTimer);
+  if (!autoGenOn()) return;                           // 既定は手動。設定で自動にできる
   if (!localStorage.getItem(GEN_KEY_STORE)) return;   // キーがなければ待つ
   sideGenTimer = setTimeout(runSideGen, 700);
 }
@@ -3577,6 +3607,10 @@ $("map").addEventListener("drop", e => {
 });
 
 /* 3D の視点 */
+$("gen-auto").checked = autoGenOn();
+$("gen-auto").addEventListener("change", e =>
+  localStorage.setItem(AUTOGEN_STORE, e.target.checked ? "1" : "0"));
+syncGenCount();
 $("gen-key").value = localStorage.getItem(GEN_KEY_STORE) || "";
 $("gen-key").addEventListener("change", e => {
   const v = e.target.value.trim();
