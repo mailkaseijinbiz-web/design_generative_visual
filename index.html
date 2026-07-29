@@ -1397,64 +1397,126 @@ function useChair(i){
    ライセンスと作者は各点に保持し、ホバーで出す。集めた画像はこのブラウザのメモリにだけ置く。 */
 const QIMG = new Map();
 let themeSeq = 0;
+const blobURL = blob => new Promise(ok => { const fr = new FileReader(); fr.onload = () => ok(fr.result); fr.readAsDataURL(blob); });
+const loadImg = src => new Promise((ok, ng) => { const im = new Image(); im.onload = () => ok(im); im.onerror = ng; im.src = src; });
+/* 画像専用の関連度検索（MediaSearch）を先に使う。説明文まで拾う全文検索と違い、
+   被写体で並ぶ。使えない環境では全文検索に落ちる。 */
+async function searchCommons(q){
+  const base = "https://commons.wikimedia.org/w/api.php?origin=*&action=query&format=json"
+    + "&prop=imageinfo&iiprop=url|mime|extmetadata&iiurlwidth=560";
+  const ask = async gen => {
+    const res = await fetch(base + gen);
+    if (!res.ok) throw new Error("api " + res.status);
+    const j = await res.json();
+    return Object.values(((j || {}).query || {}).pages || {})
+      .sort((x, y) => (x.index || 0) - (y.index || 0))
+      .map(pg => ({ title: pg.title || "", info: (pg.imageinfo || [])[0] }))
+      .filter(e => e.info && /image\/(jpe?g|png)/.test(e.info.mime || ""));
+  };
+  let pages = [];
+  try {
+    pages = await ask("&generator=mediasearch&gmstype=bitmap&gmslimit=50&gmssearch=" + encodeURIComponent(q));
+  } catch (_) { /* MediaSearch が使えなければ下の全文検索へ */ }
+  if (!pages.length)
+    pages = await ask("&generator=search&gsrnamespace=6&gsrlimit=50&gsrsearch="
+      + encodeURIComponent(`filetype:bitmap ${q}`));
+  return pages;
+}
+/* Geminiのキーが入っているときだけ、候補を「テーマが主役の画像」に絞る。
+   全候補を縮小して1回で渡し、残す番号のJSON配列をもらう。失敗したら絞らずに返す。 */
+function smallJpeg(img){
+  const k = Math.min(1, 160 / Math.max(img.naturalWidth, img.naturalHeight));
+  const cv = document.createElement("canvas");
+  cv.width = Math.max(1, Math.round(img.naturalWidth * k));
+  cv.height = Math.max(1, Math.round(img.naturalHeight * k));
+  cv.getContext("2d").drawImage(img, 0, 0, cv.width, cv.height);
+  return { mime_type:"image/jpeg", data: cv.toDataURL("image/jpeg", .6).split(",")[1] };
+}
+async function filterByTheme(q, cands){
+  const key = (localStorage.getItem(GEN_KEY_STORE) || "").trim();
+  if (!key || cands.length <= 8) return cands;
+  try {
+    const parts = [{ text:
+      `画像を番号つきで渡します。「${q}」そのものが主な被写体として写っている番号だけを、`
+      + `JSONの配列（例：[0,2,5]）で返してください。建物・風景・地図・文書・ロゴ・人物が主役のもの、`
+      + `対象が小さくしか写っていないものは除外。配列以外は何も書かないこと。` }];
+    cands.forEach(c => {
+      parts.push({ text:`#${c.i}` });
+      parts.push({ inline_data: smallJpeg(c.img) });
+    });
+    const res = await fetch("https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent", {
+      method:"POST", headers:{ "content-type":"application/json", "x-goog-api-key":key },
+      body: JSON.stringify({ contents:[{ role:"user", parts }] })
+    });
+    if (!res.ok) return cands;
+    const j = await res.json();
+    const txt = ((((j.candidates || [])[0] || {}).content || {}).parts || [])
+      .filter(x => x.text).map(x => x.text).join("");
+    const m = txt.match(/\[[\d,\s]*\]/);
+    if (!m) return cands;
+    const idx = new Set(JSON.parse(m[0]));
+    const kept = cands.filter(c => idx.has(c.i));
+    return kept.length >= 8 ? kept : cands;
+  } catch (_) { return cands; }
+}
 async function searchTheme(qRaw){
   const q = (qRaw || "").trim(), note = $("theme-note");
   if (!q) return;
-  const seq = ++themeSeq, N = 25;
+  const seq = ++themeSeq, N = 25, CAND = 36;
   note.textContent = "検索中…";
   try {
-    const api = "https://commons.wikimedia.org/w/api.php?origin=*&action=query&format=json"
-      + "&generator=search&gsrnamespace=6&gsrlimit=40"
-      + "&gsrsearch=" + encodeURIComponent(`filetype:bitmap ${q}`)
-      + "&prop=imageinfo&iiprop=url|mime|extmetadata&iiurlwidth=560";
-    const res = await fetch(api);
-    if (!res.ok) throw new Error("api " + res.status);
-    const j = await res.json();
-    const pages = Object.values(((j || {}).query || {}).pages || {})
-      .map(pg => ({ title: pg.title || "", info: (pg.imageinfo || [])[0] }))
-      .filter(e => e.info && /image\/(jpe?g|png)/.test(e.info.mime || ""));
+    const pages = await searchCommons(q);
     if (!pages.length) throw new Error("empty");
     const strip = html => { const d = document.createElement("div"); d.innerHTML = html || ""; return d.textContent.trim(); };
-    const items = [];
+    // 候補は多めに集めておき、後の選別で削られても25枚に届くようにする
+    const cands = [];
     let next = 0;
     const lane = async () => {
-      while (items.length < N && next < pages.length && seq === themeSeq){
+      while (cands.length < CAND && next < pages.length && seq === themeSeq){
         const e = pages[next++];
         try {
           const r = await fetch(e.info.thumburl || e.info.url);
           if (!r.ok) continue;
-          const blob = await r.blob();
-          const durl = await new Promise(ok => { const fr = new FileReader(); fr.onload = () => ok(fr.result); fr.readAsDataURL(blob); });
-          const img = await new Promise((ok, ng) => { const im = new Image(); im.onload = () => ok(im); im.onerror = ng; im.src = durl; });
-          if (items.length >= N || seq !== themeSeq) return;
-          // 実写サンプルと同じ経路：300pxで9項目を推定する
-          const k = Math.min(1, 300 / Math.max(img.naturalWidth, img.naturalHeight));
-          const cv = document.createElement("canvas");
-          cv.width = Math.max(1, Math.round(img.naturalWidth * k));
-          cv.height = Math.max(1, Math.round(img.naturalHeight * k));
-          const g = cv.getContext("2d", { willReadFrequently:true });
-          g.drawImage(img, 0, 0, cv.width, cv.height);
-          const est = estimate(g.getImageData(0, 0, cv.width, cv.height).data, cv.width, cv.height);
-          const prof = {}; AXES.forEach(a => prof[a.key] = est[a.key]);
-          const meta = e.info.extmetadata || {};
-          const id = `qi-${seq}-${items.length}`;
-          QIMG.set(id, durl);
-          items.push({ name: e.title.replace(/^File:/, "").replace(/\.[a-z]+$/i, "").slice(0, 42),
-                       p: prof, src:"実写", imgId:id, idx:items.length, cat:"検索", ci:0,
-                       measured:MEASURABLE,
-                       lic: strip((meta.LicenseShortName || {}).value),
-                       by: strip((meta.Artist || {}).value).slice(0, 42) });
-          note.textContent = `収集中… ${items.length}/${N}`;
+          const durl = await blobURL(await r.blob());
+          const img = await loadImg(durl);
+          if (cands.length >= CAND || seq !== themeSeq) return;
+          cands.push({ i:cands.length, e, durl, img });
+          note.textContent = `収集中… ${cands.length}/${CAND}`;
         } catch (_) { /* 読めない画像は飛ばして次へ */ }
       }
     };
     await Promise.all([0, 1, 2, 3, 4, 5].map(lane));
     if (seq !== themeSeq) return;
-    if (items.length < 8) throw new Error("few");
-    items.forEach((it, i) => it.idx = i);
+    if (cands.length < 8) throw new Error("few");
+    note.textContent = "選別中…";
+    const kept = await filterByTheme(q, cands);
+    if (seq !== themeSeq) return;
+    const use = kept.slice(0, N);
+    const items = use.map((c, i) => {
+      // 実写サンプルと同じ経路：300pxで9項目を推定する
+      const k = Math.min(1, 300 / Math.max(c.img.naturalWidth, c.img.naturalHeight));
+      const cv = document.createElement("canvas");
+      cv.width = Math.max(1, Math.round(c.img.naturalWidth * k));
+      cv.height = Math.max(1, Math.round(c.img.naturalHeight * k));
+      const g = cv.getContext("2d", { willReadFrequently:true });
+      g.drawImage(c.img, 0, 0, cv.width, cv.height);
+      const est = estimate(g.getImageData(0, 0, cv.width, cv.height).data, cv.width, cv.height);
+      const prof = {}; AXES.forEach(ax => prof[ax.key] = est[ax.key]);
+      const meta = c.e.info.extmetadata || {};
+      const id = `qi-${seq}-${i}`;
+      QIMG.set(id, c.durl);
+      return { name: c.e.title.replace(/^File:/, "").replace(/\.[a-z]+$/i, "").slice(0, 42),
+               p: prof, src:"実写", imgId:id, idx:i, cat:"検索", ci:0,
+               measured:MEASURABLE,
+               lic: strip((meta.LicenseShortName || {}).value),
+               by: strip((meta.Artist || {}).value).slice(0, 42) };
+    });
     clusterItems(items);
     registerSearchPreset(q, items);
-    note.textContent = `「${q}」${items.length}枚を配置しました（Wikimedia Commons）`;
+    const dropped = cands.length - kept.length;
+    note.textContent = `「${q}」${items.length}枚を配置しました`
+      + (dropped > 0 ? `（対象外 ${dropped}枚を除外）`
+        : (localStorage.getItem(GEN_KEY_STORE) ? "" : "／Geminiキーを入れると自動選別つき"));
   } catch (_) {
     if (seq !== themeSeq) return;
     note.textContent = "画像を集められませんでした。公開ページなど、外部に出られる場所で試してください。";
@@ -2456,6 +2518,8 @@ function bindMap(svg){
     if (tap){ openAxisModal(tap.dataset.ax); return; }
     if (state.mapProj && mapAxes().length === 2){
       const [sx, sy] = toSvg(e), P = state.mapProj;
+      const g = galleryAt(sx, sy);
+      if (g){ selectGallery(g); return; }
       const clamp = v => Math.max(1, Math.min(5, v));
       pickRegion(clamp(P.vx(sx)), clamp(P.vy(sy)));
     }
@@ -2713,6 +2777,36 @@ function regionSentences(rows, n0){
     : n0 <= 2 ? "近いところに少数の相手がいます。何で違いを出すかを決める必要があります。"
     : "ここは混んでいます。同じ場所で戦うことになるので、別の項目で差をつけるか、狙いをずらすかです。");
   return L.join("<br>");
+}
+
+/* 押した場所が生成済みの画像に当たっているかを、描画と同じ寸法で調べる */
+function galleryAt(sx, sy){
+  const P = state.mapProj; if (!P) return null;
+  const [xk, yk] = conceptAxes();
+  const S = Math.max(64, Math.min(180, state.thumb * 2.2)), h2 = S / 2;
+  // 重なっているときは後から描いたもの（上にあるもの）を優先する
+  for (let i = state.gallery.length - 1; i >= 0; i--){
+    const g = state.gallery[i];
+    if (g.xk !== xk || g.yk !== yk || g.cx == null || g.cy == null) continue;
+    const ix = P.px(g.cx), iy = P.py(g.cy);
+    if (Math.abs(sx - ix) <= h2 && Math.abs(sy - iy) <= h2) return g;
+  }
+  return null;
+}
+/* 生成済みの画像を選ぶ：領域はその位置に移すが、描き直しはしない */
+function selectGallery(g){
+  clearTimeout(sideGenTimer);           // 進行待ちの自動生成があれば取り下げる
+  ++sideGenSeq;                          // 飛行中の結果も捨てる
+  const half = 2 / CONCEPT_N;
+  const mk = v => ({ lo:Math.max(1, v - half), hi:Math.min(5, v + half), c:v });
+  state.region = { xk:g.xk, yk:g.yk, x:mk(g.cx), y:mk(g.cy) };
+  applyRegion();
+  state.genImage = g;
+  $("side-img").src = g.url;
+  $("side-img").hidden = false;
+  $("side-empty").hidden = true;
+  $("side-spin").hidden = true;
+  drawAll();
 }
 
 /* 狙う領域は軸ごとに持つ。押した場所を中心に、決まった広さで置く。 */
