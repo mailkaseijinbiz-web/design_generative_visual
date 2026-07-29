@@ -235,7 +235,6 @@ button{cursor:pointer}
 .mapui.tl{top:12px; left:12px; max-width:calc(100% - 90px)}
 .mapui.br{right:14px; bottom:86px; display:flex; flex-direction:column; align-items:flex-end; gap:8px}
 .axholder{position:absolute; width:0; height:0; overflow:hidden; opacity:0; pointer-events:none}
-.sizepop{display:flex; align-items:center; gap:10px; white-space:nowrap; padding:6px 11px}
 .floatcard{
   background:var(--surface); border:1px solid var(--line-soft); border-radius:10px;
   box-shadow:0 1px 3px rgba(15,15,15,.10), 0 6px 18px rgba(15,15,15,.09); padding:8px 12px;
@@ -268,8 +267,6 @@ button{cursor:pointer}
   padding:2px 7px; border-radius:5px}
 #map{position:absolute; inset:0; width:100%; height:100%; background:var(--surface);
      user-select:none; -webkit-user-select:none; touch-action:none; cursor:grab; display:block}
-.heatkey{display:flex; align-items:center; gap:5px; font-size:11.5px; color:var(--ink-2)}
-.heatkey i{width:64px; height:8px; border-radius:2px; flex:0 0 auto}
 
 /* ── コンセプト ── */
 
@@ -416,9 +413,6 @@ svg text{font-family:var(--font-ui)}
         <input type="file" id="corpus-file" accept="image/*" multiple hidden>
       </div>
       <div class="mapui br">
-        <div class="floatcard sizepop" id="sizepop">
-          <span class="heatkey" id="heatkey"><span>密度</span><i></i><span>少</span><span>多</span></span>
-        </div>
         <div class="zoomstack">
           <button class="btn" id="map-zoom-in" aria-label="拡大" data-ic="zoom_in"></button>
           <button class="btn" id="map-zoom-out" aria-label="縮小" data-ic="zoom_out"></button>
@@ -1875,7 +1869,7 @@ function fitMapSize(svg){
   const pw = panel && panel.offsetParent ? panel.getBoundingClientRect().width + 24 : 0;
   // 目盛と軸名がある左と下だけ余白を取り、上と右は端まで使う。
   // 浮かせたカードの下は地図が続いている（Googleマップと同じ扱い）。
-  PAD.L = 104; PAD.B = 96; PAD.T = 0; PAD.R = pw;
+  PAD.L = 60; PAD.T = 60; PAD.B = 60; PAD.R = pw;
   svg.setAttribute("viewBox", `0 0 ${MAP_W} ${MAP_H}`);
   const clip = svg.querySelector("#map-clip rect");
   if (clip){
@@ -2063,11 +2057,6 @@ function drawMap(){
     state.tab === "concept" && ks.length === 2 ? conceptOverlay(items) : "";
   mapPreview(null);
 
-  // 密度の目盛（平面のときだけ）
-  const hk = $("heatkey");
-  hk.hidden = ks.length >= 3;
-  hk.querySelector("i").style.background = `linear-gradient(90deg, ${HEAT.join(",")})`;
-
   refreshAxisLabels();
 }
 
@@ -2170,13 +2159,15 @@ function mapScene2D(ks, items){
     const majX = Math.abs(vx - Math.round(vx)) < 1e-6;
     if (one){
       for (let Y = y0 + 12; Y < y1; Y += 26)
-        plot += `<circle cx="${X.toFixed(1)}" cy="${Y.toFixed(1)}" r="${majX ? 1.7 : 1}" fill="${majX ? line : soft}"/>`;
+        plot += `<circle cx="${X.toFixed(1)}" cy="${Y.toFixed(1)}" r="${majX ? 2.2 : 1.4}" fill="${majX ? ink3 : line}" `
+          + `fill-opacity="${majX ? .55 : 1}"/>`;
       return;
     }
     dots.forEach(vy => {
       const Y = py(vy); if (Y < y0 - 2 || Y > y1 + 2) return;
       const maj = majX && Math.abs(vy - Math.round(vy)) < 1e-6;
-      plot += `<circle cx="${X.toFixed(1)}" cy="${Y.toFixed(1)}" r="${maj ? 1.8 : 1.1}" fill="${maj ? line : soft}" fill-opacity=".9"/>`;
+      plot += `<circle cx="${X.toFixed(1)}" cy="${Y.toFixed(1)}" r="${maj ? 2.3 : 1.45}" fill="${maj ? ink3 : line}" `
+        + `fill-opacity="${maj ? .55 : 1}"/>`;
     });
   });
   if (one) plot += `<line x1="${x0}" y1="${cy.toFixed(1)}" x2="${x1}" y2="${cy.toFixed(1)}" stroke="${soft}" stroke-width="1"/>`;
@@ -2216,17 +2207,19 @@ function mapScene2D(ks, items){
   [1,2,3,4,5].forEach(v => {
     const tx2 = px(v), ty2 = one ? cy : py(v);
     if (tx2 > x0 - 1 && tx2 < x1 + 1)
-      s += `<text x="${tx2.toFixed(1)}" y="${y1 + 18}" font-size="12" fill="${ink3}" text-anchor="middle" class="mono">${v}</text>`;
+      s += `<rect x="${(tx2 - 9).toFixed(1)}" y="${y1 - 24}" width="18" height="18" rx="9" fill="${paper}" opacity=".78"/>`
+        + `<text x="${tx2.toFixed(1)}" y="${y1 - 11}" font-size="12" fill="${ink3}" text-anchor="middle" class="mono">${v}</text>`;
     if (!one && ty2 > y0 - 1 && ty2 < y1 + 1)
-      s += `<text x="${x0 - 12}" y="${(ty2 + 4).toFixed(1)}" font-size="12" fill="${ink3}" text-anchor="end" class="mono">${v}</text>`;
+      s += `<rect x="${x0 + 6}" y="${(ty2 - 22).toFixed(1)}" width="18" height="18" rx="9" fill="${paper}" opacity=".78"/>`
+        + `<text x="${x0 + 15}" y="${(ty2 - 9).toFixed(1)}" font-size="12" fill="${ink3}" text-anchor="middle" class="mono">${v}</text>`;
   });
   s += axisLabels(AX[xk], !one && AX[yk], x0, x1, y0, y1, ink2, ink3, one);
   // 使っていない軸も押せるように「なし」で出しておく
-  const midX2 = (x0 + x1) / 2, midY2 = (y0 + y1) / 2, lx2 = x0 - 56;
+  const midX2 = (x0 + x1) / 2, midY2 = (y0 + y1) / 2, lx2 = x0 - 30;
   if (one)
     s += axisTap(lx2, midY2, "縦軸 なし", "y", ink3, `rotate(-90 ${lx2} ${midY2})`, true);
   if (state.tab !== "concept" && $("map-z").value === "-")
-    s += axisTap(x1 - 116, y0 + 38, "奥行き なし", "z", ink3, null, true);
+    s += axisTap(x1 - 116, y0 - 30, "奥行き なし", "z", ink3, null, true);
   return s;
 }
 
@@ -2384,7 +2377,7 @@ function axisTap(cx, cy, name, which, ink, rot, muted){
 }
 const AX_EDGE = 34;   // 両極の文字を枠の端から離す量
 function axisLabels(ax, ay, x0, x1, y0, y1, ink2, ink3, one){
-  const midX = (x0 + x1) / 2, midY = (y0 + y1) / 2, yb = y1 + 56, lx = x0 - 56;
+  const midX = (x0 + x1) / 2, midY = (y0 + y1) / 2, yb = y1 + 30, lx = x0 - 30;
   let s = `<text x="${x0 + AX_EDGE}" y="${yb + 5}" font-size="13.5" fill="${ink3}">${ax.low || "低"}</text>`
     + axisTap(midX, yb, ax.name, "x", ink2)
     + `<text x="${x1 - AX_EDGE}" y="${yb + 5}" font-size="13.5" fill="${ink3}" text-anchor="end">${ax.high || "高"}</text>`;
@@ -2401,7 +2394,7 @@ function axisLabels(ax, ay, x0, x1, y0, y1, ink2, ink3, one){
 function mapMark(it, x, y, i, size, paper){
   const col = CAT_COLORS[(it.ci || 0) % CAT_COLORS.length], h = size / 2;
   if (it.imgId)
-    return `<g data-i="${i}" data-idx="${it.idx}" style="cursor:pointer">`
+    return `<g data-i="${i}">`
       + `<rect x="${(x-h-1.5).toFixed(1)}" y="${(y-h-1.5).toFixed(1)}" width="${size+3}" height="${size+3}" rx="3" fill="${paper}"/>`
       + `<use href="#${it.imgId}" x="${(x-h).toFixed(1)}" y="${(y-h).toFixed(1)}" width="${size}" height="${size}"/>`
       + `<rect x="${(x-h).toFixed(1)}" y="${(y-h).toFixed(1)}" width="${size}" height="${size}" fill="none" `
@@ -2470,8 +2463,6 @@ function bindMap(svg){
     if (state.mapDragged) return;
     const tap = e.target.closest(".axtap");
     if (tap){ openAxisModal(tap.dataset.ax); return; }
-    const g = e.target.closest("[data-idx]");
-    if (g){ useChair(+g.dataset.idx); return; }
     if (state.tab === "concept" && state.mapProj && mapAxes().length === 2){
       const [sx, sy] = toSvg(e), P = state.mapProj;
       const N = +$("c-grid").value;
@@ -2548,7 +2539,7 @@ function mapPreview(i){
   g += `<text x="${bx + 11}" y="${ty}" font-size="12"  fill="${cssv("--ink")}">${it.name}</text>`
     +  `<circle cx="${bx + 15}" cy="${ty + 15}" r="4" fill="${col}"/>`
     +  `<text x="${bx + 25}" y="${ty + 19}" font-size="11"  fill="${cssv("--ink-3")}">${it.cat}`
-    +  `${it.imgId ? "（クリックで現状に採用）" : ""}</text>`;
+    +  `</text>`;
   // 元の点も強調
   g += it.imgId
     ? `<rect x="${x - 12}" y="${y - 12}" width="24" height="24" rx="3" fill="none" stroke="${col}" stroke-width="2.5"/>`
@@ -2608,19 +2599,20 @@ function conceptOverlay(items){
   const sel = state.region && state.region.xk === xk && state.region.yk === yk
     && state.region.n === N ? state.region : null;
 
+  // 格子は引かない。選んだ区画だけを枠で示す。
   let s = "";
-  for (let j = 0; j < N; j++) for (let i = 0; i < N; i++){
-    const n = cnt[j * N + i];
-    const cx0 = P.px(edge(i)), cx1 = P.px(edge(i + 1));
-    const cy1 = P.py(edge(j)), cy0 = P.py(edge(j + 1));
-    const on = sel && sel.i === i && sel.j === j;
+  if (sel){
+    const n = cnt[sel.j * N + sel.i];
+    const cx0 = P.px(edge(sel.i)), cx1 = P.px(edge(sel.i + 1));
+    const cy1 = P.py(edge(sel.j)), cy0 = P.py(edge(sel.j + 1));
+    const cap = `競合 ${n}件`;
     s += `<rect x="${cx0.toFixed(1)}" y="${cy0.toFixed(1)}" width="${(cx1-cx0).toFixed(1)}" `
-      + `height="${(cy1-cy0).toFixed(1)}" fill="${on ? goal : "none"}" fill-opacity="${on ? .12 : 0}" `
-      + `stroke="${on ? goal : line}" stroke-opacity="${on ? 1 : .5}" stroke-width="${on ? 2.5 : 1}"/>`
-      + `<rect x="${(cx0+4).toFixed(1)}" y="${(cy0+4).toFixed(1)}" width="${(String(n).length*7+10)}" `
-      + `height="15" rx="7.5" fill="${paper}" opacity=".82"/>`
-      + `<text x="${(cx0+9).toFixed(1)}" y="${(cy0+15).toFixed(1)}" font-size="10.5" class="mono" `
-      + `fill="${on ? goal : ink2}" font-weight="${on ? 600 : 400}">${n}</text>`;
+      + `height="${(cy1-cy0).toFixed(1)}" fill="${goal}" fill-opacity=".10" `
+      + `stroke="${goal}" stroke-width="2.5"/>`
+      + `<rect x="${(cx0+8).toFixed(1)}" y="${(cy0+8).toFixed(1)}" width="${(cap.length * 11 + 16)}" `
+      + `height="22" rx="11" fill="${paper}" opacity=".92"/>`
+      + `<text x="${(cx0+16).toFixed(1)}" y="${(cy0+23).toFixed(1)}" font-size="12" `
+      + `fill="${goal}" font-weight="600">${cap}</text>`;
   }
 
   // 重心 → 狙う領域
@@ -2651,7 +2643,7 @@ function conceptNote(sel, cnt, N, mxv, myv){
       + `（競合 ${cnt[sel.j * N + sel.i]}件）<br>市場の重心（${ax.name} ${fmt(Math.round(mxv*10)/10)}／${ay.name} ${fmt(Math.round(myv*10)/10)}）から見て、`
       + `${ax.name}は${dir(sel.cx, mxv, ax)}、${ay.name}は${dir(sel.cy, myv, ay)}。`;
   } else {
-    note.textContent = "地図の空いているところをクリックすると、その区画が狙う領域になります。数字はその区画にいる競合の数です。ホイールで拡大、ドラッグで移動。";
+    note.textContent = "地図の空いているところをクリックすると、その周辺が狙う領域になります。区画の細かさは下のグリッドで決めます。ホイールで拡大、ドラッグで移動。";
   }
   const btn = $("c-visualize");
   if (btn){
