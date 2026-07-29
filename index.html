@@ -1921,8 +1921,12 @@ function mapScene2D(ks, items){
       return (rows - 1) / 2 * (sz + 1) + sz / 2;
     }));
     let size0 = autoThumb(centres());
+    // 描いた案の正方形は写真より大きい。端の升（1や5）に置かれても
+    // 枠からはみ出さないよう、その半分ぶんまで余白を広げる。
+    const genHalf = () => state.gallery.some(g => g.xk === xk && g.yk === yk)
+      ? Math.max(64, Math.min(180, size0 * 2.2)) / 2 + 8 : 0;
     for (let pass = 0; pass < 2; pass++){
-      IN = Math.max(22, Math.min(96, extent(size0) + 6));
+      IN = Math.max(22, Math.min(110, Math.max(extent(size0) + 6, genHalf())));
       size0 = autoThumb(centres());
     }
     state.thumb = size0;
