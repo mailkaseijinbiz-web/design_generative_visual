@@ -119,6 +119,8 @@ Amazonや一般の画像検索からの収集は規約上ここからは踏み�
 
 - 叩くのは `https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent`。モデルは **Nano Banana（`gemini-2.5-flash-image`）** と **Nano Banana Pro（`gemini-3-pro-image-preview`）** から選ぶ。Googleが名前を変えたら、`index.html` の `#gen-model` の `<option value>` を書き換えれば追従できる。
 - 正方形は `generationConfig.imageConfig.aspectRatio = "1:1"` で指定する。対応しないモデルに当たった場合（HTTP 400）は、その指定を外して一度だけ投げ直す。
+- **Nano Banana Pro では出力解像度を最安の1Kに固定**（`imageSize:"1K"`）。Proは出力が4Kだと1K/2Kの約2倍かかる。Nano Banana は解像度によらず1枚定額（約$0.04）なので指定しない。手本として送る参照画像の解像度は料金にほぼ影響しない（1枚あたり$0.001未満）。
+- **受け取った画像は512pxに縮小して持つ**（`GEN_KEEP_PX`）。APIの出力は1Kが下限の定額なので縮めても料金は変わらないが、1枚約2MB→約50KBになり、25枚並べてもページが重くならない。地図の表示は最大180px、右パネルも2倍画素で700px弱なので、見た目は変わらない。
 - **APIキーは画面で入力する**。コードにもリポジトリにも書かない。そのブラウザの `localStorage`（`kansei-morph.gemini-key`）にだけ残り、「キーを消す」で消える。
 - **ローカルで `index.html` を開いたとき、または公開先に置いたときだけ動く**。公開アーティファクトは外部通信が遮断されている。
 - ブラウザから直接APIを叩く方式なので、キーは自分のものだけを、自分の端末で使うこと。共有端末や配布物に入れてはいけない。

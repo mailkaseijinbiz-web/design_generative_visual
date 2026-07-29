@@ -3265,6 +3265,11 @@ async function genImageMulti(key, model, prompt, imgs, square){
     ]}]
   };
   if (square) body.generationConfig = { imageConfig: { aspectRatio: "1:1" } };
+  // Proは出力解像度で料金が変わる（4Kは1K/2Kの約2倍）。最安の1Kに固定する。
+  if (/pro-image/.test(model)){
+    body.generationConfig = body.generationConfig || { imageConfig: {} };
+    body.generationConfig.imageConfig.imageSize = "1K";
+  }
   const send = () => fetch(url, { method:"POST",
     headers:{ "content-type":"application/json", "x-goog-api-key":key },
     body: JSON.stringify(body) });
@@ -3287,7 +3292,23 @@ async function genImageMulti(key, model, prompt, imgs, square){
     return { error: txt ? `画像が返りませんでした。モデルの返答：${txt.slice(0, 300)}` : "画像が返りませんでした。" };
   }
   const inl = img.inlineData || img.inline_data;
-  return { url: `data:${inl.mimeType || inl.mime_type || "image/png"};base64,${inl.data}` };
+  const raw = `data:${inl.mimeType || inl.mime_type || "image/png"};base64,${inl.data}`;
+  return { url: await shrinkImage(raw, GEN_KEEP_PX) };
+}
+/* 受け取った画像は縮小して持つ。APIの出力は1Kが下限の定額なので、
+   ここで縮めても料金は変わらないが、25枚並べてもページが重くならない。 */
+const GEN_KEEP_PX = 512;   // 地図は最大180px表示、右パネルは2倍画素で最大~680px。その中間を取る
+async function shrinkImage(url, max){
+  try {
+    const img = await loadImg(url);
+    const k = Math.min(1, max / Math.max(img.naturalWidth, img.naturalHeight));
+    if (k >= 1) return url;
+    const cv = document.createElement("canvas");
+    cv.width = Math.max(1, Math.round(img.naturalWidth * k));
+    cv.height = Math.max(1, Math.round(img.naturalHeight * k));
+    cv.getContext("2d").drawImage(img, 0, 0, cv.width, cv.height);
+    return cv.toDataURL("image/jpeg", .85);
+  } catch (_) { return url; }
 }
 /* ── 5×5の25通りを一気に描く ──
    両軸を1〜5で刻み、升目の中央それぞれを狙いとして描き、地図に並べる。
