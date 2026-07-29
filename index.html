@@ -535,6 +535,7 @@ svg text{font-family:var(--font-ui)}
 </div>
 
 <script src="samples/chairs.js"></script>
+<script src="samples/renders.js"></script>
 <script>
 "use strict";
 
@@ -1346,6 +1347,22 @@ function usePreset(id){
 
 /* ── 椅子だけは実写サンプル（利用者提供の30点） ── */
 const CHAIRS = window.__CHAIRS || [];
+/* 椅子以外の5テーマは、アプリ自身の3Dレンダラで事前描画したサンプルを持つ */
+const SAMPLES = window.__SAMPLES || {};
+/* imgId から画像（data URI）を引く。ci-… は実写、si-… は事前レンダ */
+function sampleSrc(imgId){
+  if (!imgId) return null;
+  if (imgId.startsWith("ci-")){
+    const c = CHAIRS.find(x => `ci-${x.id}` === imgId);
+    return c ? c.src : null;
+  }
+  const m = /^si-([a-z]+)-(\d+)$/.exec(imgId);
+  if (m){
+    const s = (SAMPLES[m[1]] || []).find(x => String(x.id) === m[2]);
+    return s ? s.src : null;
+  }
+  return null;
+}
 function useChair(i){
   const c = CHAIRS[i]; if (!c) return;
   state.chairIdx = i;
@@ -1562,8 +1579,17 @@ function buildCorpus(id){
   });
   return out;
 }
+/* 事前レンダのサンプルからコーパスを組む。プロファイルは既知なので推定しない。 */
+function sampleCorpus(id){
+  return SAMPLES[id].map((s, i) => ({
+    name:s.name, p:{ ...s.p }, src:"レンダ", imgId:`si-${id}-${s.id}`, idx:i,
+    cat:s.cat, ci:s.ci, measured:AXES.map(a => a.key)
+  }));
+}
 const corpusOf = id => {
   if (id === "chair" && CHAIRS.length){ ensureChairCorpus(); return state.corpus.chair || []; }
+  if ((SAMPLES[id] || []).length)
+    return state.corpus[id] || (state.corpus[id] = sampleCorpus(id));
   return state.corpus[id] || (state.corpus[id] = buildCorpus(id));
 };
 const visibleCorpus = () => corpusOf(state.preset || "chair").filter(it => !state.catOff.has(it.cat));
@@ -1862,6 +1888,10 @@ function drawMap(){
       + CHAIRS.map(c => `<symbol id="ci-${c.id}" viewBox="0 0 100 100" `
         + `preserveAspectRatio="xMidYMid slice"><image href="${c.src}" x="0" y="0" width="100" `
         + `height="100" preserveAspectRatio="xMidYMid slice" clip-path="url(#thumb-clip)"/></symbol>`).join("")
+      + Object.entries(SAMPLES).map(([tid, list]) => list.map(s =>
+          `<symbol id="si-${tid}-${s.id}" viewBox="0 0 100 100" `
+        + `preserveAspectRatio="xMidYMid slice"><image href="${s.src}" x="0" y="0" width="100" `
+        + `height="100" preserveAspectRatio="xMidYMid slice" clip-path="url(#thumb-clip)"/></symbol>`).join("")).join("")
       + `</defs><g id="map-layer"></g><g id="map-grid" pointer-events="none"></g>`
       + `<g id="map-hover" pointer-events="none"></g>`);
     svg.dataset.ready = "1";
@@ -1918,7 +1948,8 @@ function mapScene2D(ks, items){
     const extent = sz => Math.max(...[...groups.values()].map(list => {
       const cols = one ? 1 : Math.ceil(Math.sqrt(list.length));
       const rows = Math.ceil(list.length / cols);
-      return (rows - 1) / 2 * (sz + 1) + sz / 2;
+      // 縦にも横にも積むので、広がりの大きいほうで余白を取る
+      return (Math.max(rows, cols) - 1) / 2 * (sz + 1) + sz / 2;
     }));
     let size0 = autoThumb(centres());
     // 描いた案の正方形は写真より大きい。端の升（1や5）に置かれても
@@ -2373,7 +2404,7 @@ function mapPreview(i){
   const { it, x, y } = state.mapPos[i];
   const W = 760, H = 470, paper = cssv("--paper"), line = cssv("--line");
   const col = CAT_COLORS[(it.ci || 0) % CAT_COLORS.length];
-  const img = it.imgId ? (CHAIRS.find(c => `ci-${c.id}` === it.imgId) || {}).src : null;
+  const img = sampleSrc(it.imgId);
   const w = img ? 168 : 172, side = w - 16, h = (img ? side + 12 : 6) + 44;
   let bx = x + 18; if (bx + w > W - 6) bx = x - 18 - w;
   let by = Math.max(6, Math.min(H - h - 6, y - h / 2));
@@ -3096,7 +3127,17 @@ function sideGenPrompt(refs, dir, rg){
   const id = state.preset || "chair", p = PRESETS.find(x => x.id === id), r = rg || state.region;
   const [xk, yk] = conceptAxes();
   const L = [];
-  if (refs.length){
+  const rendered = refs.length && refs.every(it => it.src === "レンダ");
+  if (rendered){
+    L.push(`添付は、いま見ている市場の${p ? p.name : "製品"}を簡略化した参考レンダリングです（狙う位置に近い順）。`);
+    refs.forEach((it, i) => {
+      L.push(`・${i + 1}枚目：${AX[xk].name} ${fmt(it.p[xk])}／${AX[yk].name} ${fmt(it.p[yk])}`);
+    });
+    L.push("");
+    L.push(`これらの構成・色・素材の方向性を手がかりに、**次の位置を狙った新しい${p ? p.name : "製品"}**を1枚描いてください。`);
+    L.push("レンダの粗さは引き継がず、**実物をスタジオで撮った製品写真**の質感（実在の素材、自然な光と影）で描くこと。");
+    L.push("被写体は1点、背景は白に近い無地。**正方形（1:1）の画像**にしてください。");
+  } else if (refs.length){
     L.push(`添付は、いま見ている市場に実在する${p ? p.name : "製品"}の写真です（狙う位置に近い順）。`);
     refs.forEach((it, i) => {
       L.push(`・${i + 1}枚目：${AX[xk].name} ${fmt(it.p[xk])}／${AX[yk].name} ${fmt(it.p[yk])}`);
@@ -3135,9 +3176,9 @@ function sideGenPrompt(refs, dir, rg){
   return L.join("\n");
 }
 function refBase64(it){
-  const c = CHAIRS.find(x => `ci-${x.id}` === it.imgId);
-  if (!c) return null;
-  const m = /^data:(image\/[a-z+]+);base64,(.+)$/.exec(c.src);
+  const src = sampleSrc(it.imgId);
+  if (!src) return null;
+  const m = /^data:(image\/[a-z+]+);base64,(.+)$/.exec(src);
   return m ? { mime_type:m[1], data:m[2] } : null;
 }
 /* 位置をひとつ渡して、その狙いの姿を1枚描く。側面にも一覧にも同じ道を使う。 */
