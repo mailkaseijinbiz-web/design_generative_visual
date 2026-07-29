@@ -197,6 +197,13 @@ button{cursor:pointer}
   display:flex; gap:16px; flex-wrap:wrap; font-family:var(--font-mono);
   font-size:11.5px; color:var(--ink-3); font-variant-numeric:tabular-nums;
 }
+.genrow{display:grid; grid-template-columns:minmax(0,1fr) minmax(300px,380px); gap:16px; flex:1 1 auto; min-height:0}
+.genrow .viewport{min-height:320px}
+.genrow #gen-img{max-width:100%; max-height:100%; display:block; border-radius:6px}
+.genside{display:flex; flex-direction:column; min-height:0}
+.genside h3{margin:0 0 8px; font-size:12.5px; font-weight:600; color:var(--ink-3); display:flex; align-items:center; gap:7px}
+.genside .brief{flex:1 1 auto; min-height:200px}
+#gen-model{background:var(--surface); border:1px solid var(--line); border-radius:6px; padding:3px 8px; font-size:12.5px}
 .variants{display:grid; grid-template-columns:repeat(4,1fr); gap:8px}
 .variant{
   border:1px solid var(--line-soft); background:var(--sunk); padding:0; border-radius:8px;
@@ -468,6 +475,7 @@ svg text{font-family:var(--font-ui)}
       <div class="modeswitch" role="group" aria-label="表示">
         <button id="vis-3d" aria-pressed="true" data-ic="view_in_ar">3D形状</button>
         <button id="vis-img" aria-pressed="false" data-ic="image">画像改変</button>
+        <button id="vis-gen" aria-pressed="false" data-ic="auto_awesome">AI画像生成</button>
       </div>
     </div>
 
@@ -505,6 +513,32 @@ svg text{font-family:var(--font-ui)}
         <div class="variants" id="variants"></div>
       </div>
       <div class="readout" id="readout"></div>
+    </div>
+
+    <div class="stage-body" id="stage-gen" hidden>
+      <p class="hint">いまの画像と9項目の差分を <strong>Gemini の画像モデル（Nano Banana）</strong> に渡して、
+        目標プロファイルどおりに描き直してもらいます。APIキーは<strong>この画面で入力し、ブラウザのlocalStorageにだけ保存</strong>します。
+        コードにもリポジトリにも書き込みません。公開ページは外部通信が遮断されているため、<strong>ローカルで index.html を開いたときだけ</strong>動きます。</p>
+      <div class="row" style="margin-bottom:10px">
+        <input type="password" id="gen-key" class="keyfield" placeholder="AIza… （自分のGemini APIキー）" autocomplete="off" spellcheck="false">
+        <select id="gen-model" aria-label="モデル">
+          <option value="gemini-2.5-flash-image">Nano Banana（gemini-2.5-flash-image）</option>
+          <option value="gemini-3-pro-image-preview">Nano Banana Pro（gemini-3-pro-image-preview）</option>
+        </select>
+        <button class="btn primary mini" id="gen-run" data-ic="auto_awesome">この目標で描いてもらう</button>
+        <button class="btn mini" id="gen-clear" data-ic="delete">キーを消す</button>
+      </div>
+      <div class="genrow">
+        <div class="viewport" id="gen-view">
+          <img id="gen-img" alt="生成された改変案" hidden>
+          <span class="badge l" id="gen-badge">まだ生成していません</span>
+        </div>
+        <div class="genside">
+          <h3 data-ic="edit_note">渡す指示文</h3>
+          <textarea class="brief" id="gen-prompt" spellcheck="false" aria-label="生成に渡す指示文"></textarea>
+          <p class="cap" id="gen-note" style="margin:8px 0 0"></p>
+        </div>
+      </div>
     </div>
   </div>
 
@@ -3192,10 +3226,11 @@ function setTab(t){
 }
 function setVis(m){
   state.vis = m;
-  $("vis-3d").setAttribute("aria-pressed", m === "3d");
-  $("vis-img").setAttribute("aria-pressed", m === "img");
-  $("stage-3d").hidden = m !== "3d";
-  $("stage-img").hidden = m !== "img";
+  ["3d", "img", "gen"].forEach(k => {
+    $("vis-" + k).setAttribute("aria-pressed", String(m === k));
+    $("stage-" + k).hidden = m !== k;
+  });
+  if (m === "gen") $("gen-prompt").value = genPrompt();
   drawAll();
 }
 
@@ -3253,6 +3288,110 @@ window.addEventListener("paste", e => {
   if (item) loadFile(item.getAsFile());
 });
 
+
+/* ============================================================
+   AI画像生成（任意）─ Gemini の画像モデル「Nano Banana」
+   いまの画像と9項目の差分を渡して、目標どおりに描き直してもらう。
+   APIキーは実行時に入力し、このブラウザの localStorage にのみ置く。
+   ソースにもリポジトリにも書かない。公開ページは外部通信が禁じられて
+   いるため、ローカルで開いたときだけ動く。
+   ============================================================ */
+const GEN_KEY_STORE = "kansei-morph.gemini-key";
+
+/* 9項目の差分を、絵として何をどう変えるかの指示に直す */
+function genPrompt(){
+  const id = state.preset || "chair", ctx = CONTEXT[id] || CONTEXT.chair;
+  const p = PRESETS.find(x => x.id === id);
+  const d = deltas();
+  const moved = AXES.filter(a => d[a.key] !== 0);
+  const L = [];
+  L.push(`この写真の${p ? p.name : "製品"}を、被写体・構図・画角・背景の構成は変えずに、次の方向へ描き直してください。`);
+  L.push(`用途文脈：${p ? p.context : ""}`);
+  L.push("");
+  L.push("【変える項目（山岡俊樹の感性デザイン9項目・1〜5）】");
+  if (moved.length){
+    moved.forEach(a => {
+      const to = state.goal[a.key], from = state.now[a.key];
+      L.push(`・${a.name}：${fmt(from)} → ${fmt(to)}（${fmtd(d[a.key])}）／${d[a.key] > 0 ? (a.bUp || a.up) : (a.bDown || a.down)}`);
+    });
+  } else L.push("・差分なし（現状を維持）");
+  L.push("");
+  L.push("【変えない項目】");
+  const keep = AXES.filter(a => d[a.key] === 0).map(a => a.name);
+  L.push(keep.length ? `・${keep.join("、")} は現状のまま維持` : "・なし");
+  const taboo = Object.keys(ctx.taboo || {});
+  if (taboo.length){
+    L.push("");
+    L.push("【禁止】");
+    taboo.forEach(k => L.push(`・${AX[k].name}を上げない：${ctx.taboo[k]}`));
+  }
+  L.push("");
+  L.push("出力は画像1枚だけ。文字・ロゴ・透かしは入れないこと。実在の商品名やブランドは想起させないこと。");
+  return L.join("\n");
+}
+
+/* 生成のもとにする画像（画像改変の結果 → なければ3Dの見え方） */
+function genSourceJPEG(){
+  if (processed && state.src){
+    const { w, h } = state.src;
+    const c = document.createElement("canvas");
+    c.width = w; c.height = h;
+    c.getContext("2d").putImageData(new ImageData(new Uint8ClampedArray(processed), w, h), 0, 0);
+    return [c.toDataURL("image/jpeg", .9).split(",")[1], "image/jpeg"];
+  }
+  const cv = $("three");
+  return [cv.toDataURL("image/jpeg", .9).split(",")[1], "image/jpeg"];
+}
+
+async function runNanoBanana(){
+  const key = ($("gen-key").value || "").trim();
+  const btn = $("gen-run"), note = $("gen-note"), badge = $("gen-badge");
+  if (!key){ note.textContent = "APIキーを入れてください。"; $("gen-key").focus(); return; }
+  const model = $("gen-model").value;
+  btn.disabled = true; badge.textContent = "生成中…"; note.textContent = "";
+  try {
+    const [data, mime] = genSourceJPEG();
+    const res = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`,
+      { method:"POST",
+        headers:{ "content-type":"application/json", "x-goog-api-key":key },
+        body: JSON.stringify({
+          contents: [{ role:"user", parts: [
+            { text: $("gen-prompt").value || genPrompt() },
+            { inline_data: { mime_type: mime, data } }
+          ]}]
+        }) });
+    if (!res.ok){
+      const t = await res.text();
+      note.textContent = res.status === 400 || res.status === 403
+        ? `認証か権限で断られました（${res.status}）。キーと、そのキーで画像モデルが使えるかを確かめてください。`
+        : `${res.status}：${t.slice(0, 300)}`;
+      badge.textContent = "生成できませんでした";
+      return;
+    }
+    const j = await res.json();
+    const parts = (((j.candidates || [])[0] || {}).content || {}).parts || [];
+    const img = parts.find(x => x.inlineData || x.inline_data);
+    if (!img){
+      const txt = parts.filter(x => x.text).map(x => x.text).join("\n");
+      note.textContent = txt ? `画像が返りませんでした。モデルの返答：${txt.slice(0, 300)}` : "画像が返りませんでした。";
+      badge.textContent = "生成できませんでした";
+      return;
+    }
+    const inl = img.inlineData || img.inline_data;
+    $("gen-img").src = `data:${inl.mimeType || inl.mime_type || "image/png"};base64,${inl.data}`;
+    $("gen-img").hidden = false;
+    badge.textContent = `${model}／${moveSummary()}`;
+    note.textContent = "画像を右クリックで保存できます。指示文を書き換えてもう一度押せば描き直せます。";
+  } catch (e) {
+    badge.textContent = "生成できませんでした";
+    note.textContent = "外部への通信ができませんでした。公開ページでは遮断されています。ローカルで index.html を開いて試してください。";
+  } finally { btn.disabled = false; }
+}
+function moveSummary(){
+  const d = deltas(), moved = AXES.filter(a => d[a.key] !== 0);
+  return moved.length ? moved.map(a => `${a.name}${fmtd(d[a.key])}`).join(" ") : "差分なし";
+}
 
 /* ============================================================
    AI講評（任意）
@@ -3502,6 +3641,17 @@ $("ai-clear").addEventListener("click", () => {
   localStorage.removeItem(AI_KEY_STORE); $("ai-key").value = ""; $("ai-out").value = "";
 });
 $("ai-run").addEventListener("click", askClaude);
+
+$("gen-key").value = localStorage.getItem(GEN_KEY_STORE) || "";
+$("gen-key").addEventListener("change", e => {
+  const v = e.target.value.trim();
+  v ? localStorage.setItem(GEN_KEY_STORE, v) : localStorage.removeItem(GEN_KEY_STORE);
+});
+$("gen-clear").addEventListener("click", () => {
+  localStorage.removeItem(GEN_KEY_STORE); $("gen-key").value = "";
+});
+$("gen-run").addEventListener("click", runNanoBanana);
+$("vis-gen").addEventListener("click", () => setVis("gen"));
 
 $("btn-save-cand").addEventListener("click", () => {
   const d = deltas();
