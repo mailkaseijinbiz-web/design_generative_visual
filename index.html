@@ -258,6 +258,18 @@ button{cursor:pointer}
 .mappanel-head .cap{font-size:12px; color:var(--ink-3)}
 .mappanel-body{padding:12px 16px 18px; overflow:auto; flex:1 1 auto; min-height:0}
 .mappanel-body .hint{margin-bottom:10px}
+/* 狙う領域：軸ごとの一覧と要約 */
+.rgnlist{display:flex; flex-direction:column; gap:2px; margin:0 -6px 10px}
+.rgnrow{
+  display:grid; grid-template-columns:minmax(0,1fr) auto auto auto; gap:10px;
+  align-items:center; padding:7px 8px; border-radius:8px; background:var(--sunk); font-size:13px;
+}
+.rgnrow b{font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis}
+.rgnrow .rng{font-size:12.5px; color:var(--ink-2); font-variant-numeric:tabular-nums; white-space:nowrap}
+.rgnrow .dir{font-size:12px; color:var(--goal); white-space:nowrap}
+.rgnrow .btn{padding:2px 5px; border-color:transparent; background:transparent}
+.rgnrow .btn:hover{background:var(--hover); box-shadow:none}
+.rgnsum{margin:0; font-size:12.5px; line-height:1.75; color:var(--ink-2)}
 /* 領域を選んだときに出る、その狙いの立体 */
 .sideview{position:relative; margin:0 0 12px; border-radius:8px; overflow:hidden;
   border:1px solid var(--line-soft); background:var(--sunk)}
@@ -439,13 +451,6 @@ svg text{font-family:var(--font-ui)}
           <div class="sideview" id="sideview" hidden>
             <canvas id="side3d" width="640" height="440"></canvas>
             <span class="badge" id="side3d-badge">─</span>
-          </div>
-          <div class="mapbar" style="margin:0 0 12px">
-            <label>グリッド <select id="c-grid">
-              <option value="2">2×2</option><option value="3">3×3</option>
-              <option value="4">4×4</option><option value="5" selected>5×5</option>
-              <option value="6">6×6</option><option value="8">8×8</option></select></label>
-            <button class="btn mini" id="c-clear" data-ic="close">指定を外す</button>
           </div>
           <p class="hint" id="c-region"></p>
           <div class="row" style="margin:0 0 14px">
@@ -641,6 +646,7 @@ const ICONS = {
   visibility:"M607.5-372.5Q660-425 660-500t-52.5-127.5Q555-680 480-680t-127.5 52.5Q300-575 300-500t52.5 127.5Q405-320 480-320t127.5-52.5Zm-204-51Q372-455 372-500t31.5-76.5Q435-608 480-608t76.5 31.5Q588-545 588-500t-31.5 76.5Q525-392 480-392t-76.5-31.5ZM214-281.5Q94-363 40-500q54-137 174-218.5T480-800q146 0 266 81.5T920-500q-54 137-174 218.5T480-200q-146 0-266-81.5ZM480-500Zm207.5 160.5Q782-399 832-500q-50-101-144.5-160.5T480-720q-113 0-207.5 59.5T128-500q50 101 144.5 160.5T480-280q113 0 207.5-59.5Z",
   edit_note:"M160-400v-80h280v80H160Zm0-160v-80h440v80H160Zm0-160v-80h440v80H160Zm360 560v-123l221-220q9-9 20-13t22-4q12 0 23 4.5t20 13.5l37 37q8 9 12.5 20t4.5 22q0 11-4 22.5T863-380L643-160H520Zm300-263-37-37 37 37ZM580-220h38l121-122-18-19-19-18-122 121v38Zm141-141-19-18 37 37-18-19Z",
   info:"M440-280h80v-240h-80v240Zm68.5-331.5Q520-623 520-640t-11.5-28.5Q497-680 480-680t-28.5 11.5Q440-657 440-640t11.5 28.5Q463-600 480-600t28.5-11.5ZM480-80q-83 0-156-31.5T197-197q-54-54-85.5-127T80-480q0-83 31.5-156T197-763q54-54 127-85.5T480-880q83 0 156 31.5T763-763q54 54 85.5 127T880-480q0 83-31.5 156T763-197q-54 54-127 85.5T480-80Zm0-80q134 0 227-93t93-227q0-134-93-227t-227-93q-134 0-227 93t-93 227q0 134 93 227t227 93Zm0-320Z",
+  flag:"M200-120v-680h360l16 80h224v400H520l-16-80H280v280h-80Zm300-440Zm86 160h134v-240H510l-16-80H280v240h290l16 80Z",
   key:"M223.5-423.5Q200-447 200-480t23.5-56.5Q247-560 280-560t56.5 23.5Q360-513 360-480t-23.5 56.5Q313-400 280-400t-56.5-23.5ZM280-240q-100 0-170-70T40-480q0-100 70-170t170-70q67 0 121.5 33t86.5 87h352l120 120-180 180-80-60-80 60-85-60h-47q-32 54-86.5 87T280-240Zm0-80q56 0 98.5-34t56.5-86h125l58 41 82-61 71 55 75-75-40-40H435q-14-52-56.5-86T280-640q-66 0-113 47t-47 113q0 66 47 113t113 47Z"
 };
 function icon(name, cls){
@@ -2049,7 +2055,7 @@ function autoThumb(centres){
 }
 
 /* ドットの色：密度の高いところは青、外は淡いグレー。1px前後の細かい点。 */
-const DOT_BLUE = [[158,196,240], [96,155,224], [42,108,190]];
+const DOT_BLUE = [[118,168,232], [56,122,206], [20,78,156]];
 function heatAt(X, Y){
   const F = state.heatField;
   if (!F || !F.mx || F.x0 === undefined) return 0;
@@ -2057,9 +2063,15 @@ function heatAt(X, Y){
   if (i < 0 || j < 0 || i >= F.cw || j >= F.ch) return 0;
   return Math.min(1, F.d[j * F.cw + i] / F.mx);
 }
+/* 1pxの点は円だと滲むので、画素境界に載せた矩形で打つ */
+function dotRect(X, Y, maj, fill, op){
+  const w = maj ? 2 : 1, o = maj ? 1 : .5;
+  return `<rect x="${(Math.round(X) - o).toFixed(1)}" y="${(Math.round(Y) - o).toFixed(1)}" `
+    + `width="${w}" height="${w}" fill="${fill}" fill-opacity="${op}"/>`;
+}
 function dotPaint(X, Y, maj, line, ink3){
   const t = heatAt(X, Y);
-  if (t < .05) return [maj ? ink3 : line, maj ? .65 : 1];
+  if (t < .05) return [ink3, maj ? 1 : .55];
   const c = DOT_BLUE[t < .3 ? 0 : t < .62 ? 1 : 2];
   return [`rgb(${c.join(",")})`, 1];
 }
@@ -2208,7 +2220,7 @@ function mapScene2D(ks, items){
     if (one){
       for (let Y = y0 + 12; Y < y1; Y += 26){
         const [f, o] = dotPaint(X, Y, majX, line, ink3);
-        plot += `<circle cx="${X.toFixed(1)}" cy="${Y.toFixed(1)}" r="${majX ? 1 : .5}" fill="${f}" fill-opacity="${o}"/>`;
+        plot += dotRect(X, Y, majX, f, o);
       }
       return;
     }
@@ -2216,7 +2228,7 @@ function mapScene2D(ks, items){
       const Y = py(vy); if (Y < y0 - 2 || Y > y1 + 2) return;
       const maj = majX && Math.abs(vy - Math.round(vy)) < 1e-6;
       const [f, o] = dotPaint(X, Y, maj, line, ink3);
-      plot += `<circle cx="${X.toFixed(1)}" cy="${Y.toFixed(1)}" r="${maj ? 1 : .5}" fill="${f}" fill-opacity="${o}"/>`;
+      plot += dotRect(X, Y, maj, f, o);
     });
   });
   if (one) plot += `<line x1="${x0}" y1="${cy.toFixed(1)}" x2="${x1}" y2="${cy.toFixed(1)}" stroke="${soft}" stroke-width="1"/>`;
@@ -2465,12 +2477,14 @@ function mapMark(it, x, y, i, size, paper){
     + `fill-opacity="${it.src === "合成" ? .65 : .9}" stroke="${paper}" stroke-width="2"/>`;
 }
 
-/* 目標の目印（現状は地図に出さない） */
+/* 目標の目印（旗）。現状は地図に出さない。 */
 function marker(gx, gy, goal, paper){
-  return `<rect x="${gx - 10}" y="${gy - 10}" width="20" height="20" rx="4" fill="${paper}" opacity=".9"/>`
-    + `<rect x="${gx - 7}" y="${gy - 7}" width="14" height="14" rx="3" fill="${goal}"/>`
-    + `<rect x="${gx + 13}" y="${gy - 9}" width="34" height="18" rx="9" fill="${paper}" opacity=".92"/>`
-    + `<text x="${gx + 18}" y="${gy + 4}" font-size="11.5" font-weight="600" fill="${goal}">目標</text>`;
+  const S = 30, k = S / 960;
+  return `<g transform="translate(${(gx - S * .42).toFixed(1)} ${(gy + S * .5).toFixed(1)}) scale(${k.toFixed(5)})">`
+    + `<path d="${ICONS.flag}" fill="none" stroke="${paper}" stroke-width="150" stroke-linejoin="round"/>`
+    + `<path d="${ICONS.flag}" fill="${goal}"/></g>`
+    + `<rect x="${gx + 14}" y="${gy - 19}" width="36" height="19" rx="9.5" fill="${paper}" opacity=".92"/>`
+    + `<text x="${gx + 19}" y="${gy - 5}" font-size="12" font-weight="600" fill="${goal}">目標</text>`;
 }
 
 /* 軸を変えたら、点が新しい位置へ滑らかに移動する */
@@ -2527,9 +2541,8 @@ function bindMap(svg){
     if (tap){ openAxisModal(tap.dataset.ax); return; }
     if (state.tab === "concept" && state.mapProj && mapAxes().length === 2){
       const [sx, sy] = toSvg(e), P = state.mapProj;
-      const N = +$("c-grid").value;
-      const cell = v => Math.max(0, Math.min(N - 1, Math.floor((Math.max(1, Math.min(5, v)) - 1) / 4 * N)));
-      pickRegion(cell(P.vx(sx)), cell(P.vy(sy)));
+      const clamp = v => Math.max(1, Math.min(5, v));
+      pickRegion(clamp(P.vx(sx)), clamp(P.vy(sy)));
     }
   });
   svg.addEventListener("mousemove", e => {
@@ -2635,6 +2648,7 @@ function addImagesToCorpus(files){
 
 
 /* ── コンセプト：市場マップ上でグリッドを切り、狙う領域を指定する ── */
+const CONCEPT_N = 5;   // 狙う領域の区画の細かさ（5×5で固定）
 const conceptAxes = () => [$("map-x").value, $("map-y").value];
 
 /* コンセプト：調査と同じ地図の上に、狙う領域のグリッドを重ねる。
@@ -2642,35 +2656,30 @@ const conceptAxes = () => [$("map-x").value, $("map-y").value];
 function conceptOverlay(items){
   const P = state.mapProj; if (!P) return "";
   const [xk, yk] = conceptAxes();
-  const N = +$("c-grid").value;
+  const N = CONCEPT_N;
   const line = cssv("--line"), goal = cssv("--goal"), ink2 = cssv("--ink-2"), paper = cssv("--paper");
   const sel = state.region && state.region.xk === xk && state.region.yk === yk
-    && state.region.n === N ? state.region : null;
+    ? state.region : null;
 
-  // 格子は引かない。選んだ区画だけを、目標の点を中心にした枠で示す。
+  // 格子は引かない。指定した軸の帯だけを、目標を中心にして示す。
   let s = "";
   let n0 = 0;
-  if (sel){
-    const n = items.filter(it => it.p[xk] >= sel.x0 && it.p[xk] <= sel.x1
-                              && it.p[yk] >= sel.y0 && it.p[yk] <= sel.y1).length;
-    n0 = n;
-    const cx0 = P.px(sel.x0), cx1 = P.px(sel.x1);
-    const cy1 = P.py(sel.y0), cy0 = P.py(sel.y1);
-    const cap = `競合 ${n}件`;
-    s += `<rect x="${cx0.toFixed(1)}" y="${cy0.toFixed(1)}" width="${(cx1-cx0).toFixed(1)}" `
-      + `height="${(cy1-cy0).toFixed(1)}" fill="${goal}" fill-opacity=".10" `
-      + `stroke="${goal}" stroke-width="2.5"/>`
-      + `<rect x="${(cx0+8).toFixed(1)}" y="${(cy0+8).toFixed(1)}" width="${(cap.length * 11 + 16)}" `
-      + `height="22" rx="11" fill="${paper}" opacity=".92"/>`
-      + `<text x="${(cx0+16).toFixed(1)}" y="${(cy0+23).toFixed(1)}" font-size="12" `
-      + `fill="${goal}" font-weight="600">${cap}</text>`;
-  }
-
-  // 重心 → 狙う領域
   const mean = k => items.length ? items.reduce((t, it) => t + it.p[k], 0) / items.length : 3;
   const mxv = mean(xk), myv = mean(yk);
   if (sel){
-    const gx0 = P.px(mxv), gy0 = P.py(myv), tx = P.px(sel.cx), ty = P.py(sel.cy);
+    n0 = items.filter(it => (!sel.x || (it.p[xk] >= sel.x.lo && it.p[xk] <= sel.x.hi))
+                         && (!sel.y || (it.p[yk] >= sel.y.lo && it.p[yk] <= sel.y.hi))).length;
+    const cx0 = sel.x ? P.px(sel.x.lo) : P.x0, cx1 = sel.x ? P.px(sel.x.hi) : P.x1;
+    const cy0 = sel.y ? P.py(sel.y.hi) : P.y0, cy1 = sel.y ? P.py(sel.y.lo) : P.y1;
+    s += `<rect x="${cx0.toFixed(1)}" y="${cy0.toFixed(1)}" width="${(cx1-cx0).toFixed(1)}" `
+      + `height="${(cy1-cy0).toFixed(1)}" fill="${goal}" fill-opacity=".10" `
+      + `stroke="${goal}" stroke-width="2.5"/>`;
+  }
+
+  // 重心 → 狙う領域
+  if (sel){
+    const gx0 = P.px(mxv), gy0 = P.py(myv);
+    const tx = P.px(sel.x ? sel.x.c : mxv), ty = P.py(sel.y ? sel.y.c : myv);
     s += `<line x1="${gx0.toFixed(1)}" y1="${gy0.toFixed(1)}" x2="${tx.toFixed(1)}" y2="${ty.toFixed(1)}" `
       + `stroke="${paper}" stroke-width="4.5"/>`
       + `<line x1="${gx0.toFixed(1)}" y1="${gy0.toFixed(1)}" x2="${tx.toFixed(1)}" y2="${ty.toFixed(1)}" `
@@ -2679,46 +2688,89 @@ function conceptOverlay(items){
       + `<circle cx="${tx.toFixed(1)}" cy="${ty.toFixed(1)}" r="5.5" fill="${goal}"/>`;
   }
 
-  conceptNote(sel, n0, N, mxv, myv);
+  conceptNote(sel, n0, mxv, myv);
   return `<g clip-path="url(#map-clip)">${s}</g>`;
 }
 
 /* 領域の説明と、可視化へ渡すボタンの状態 */
-function conceptNote(sel, n0, N, mxv, myv){
-  const [xk, yk] = conceptAxes(), ax = AX[xk], ay = AX[yk];
+/* 狙う領域を、軸ごとの数値の一覧＋日本語の要約で出す */
+function conceptNote(sel, n0, mxv, myv){
+  const [xk, yk] = conceptAxes();
   const note = $("c-region");
-  if (sel){
-    const dir = (v, m, a) => v > m + .15 ? `${a.high || "高"}側へ +${fmt(Math.round((v-m)*10)/10)}`
-              : v < m - .15 ? `${a.low || "低"}側へ −${fmt(Math.round((m-v)*10)/10)}` : "重心と同じ";
-    note.innerHTML = `狙う領域：<b>${ax.name} ${fmt(sel.x0)}〜${fmt(sel.x1)}／${ay.name} ${fmt(sel.y0)}〜${fmt(sel.y1)}</b>`
-      + `（競合 ${n0}件）<br>市場の重心（${ax.name} ${fmt(Math.round(mxv*10)/10)}／${ay.name} ${fmt(Math.round(myv*10)/10)}）から見て、`
-      + `${ax.name}は${dir(sel.cx, mxv, ax)}、${ay.name}は${dir(sel.cy, myv, ay)}。`;
+  const rows = sel ? [["x", xk, sel.x, mxv], ["y", yk, sel.y, myv]].filter(r => r[2]) : [];
+  const dirWord = (v, m, a) => v > m + .15 ? `${a.high || "高"}側へ +${fmt(Math.round((v - m) * 10) / 10)}`
+                : v < m - .15 ? `${a.low || "低"}側へ −${fmt(Math.round((m - v) * 10) / 10)}`
+                : "重心と同じ";
+  if (rows.length){
+    note.innerHTML = `<div class="rgnlist">` + rows.map(([w, k, r, m]) => {
+      const a = AX[k];
+      return `<div class="rgnrow"><b>${a.name}</b>`
+        + `<span class="rng mono">${fmt(r.lo)}〜${fmt(r.hi)}</span>`
+        + `<span class="dir">${dirWord(r.c, m, a)}</span>`
+        + `<button type="button" class="btn mini" data-off="${w}" data-ic="close" `
+        + `aria-label="${a.name}の指定を外す"></button></div>`;
+    }).join("") + `</div>`
+      + `<p class="rgnsum">${regionSentences(rows, n0)}</p>`;
+    note.querySelectorAll("[data-off]").forEach(b =>
+      b.addEventListener("click", () => clearRegionAxis(b.dataset.off)));
+    paintIcons(note);
   } else {
-    note.textContent = "地図の空いているところをクリックすると、その周辺が狙う領域になります。区画の細かさは下のグリッドで決めます。ホイールで拡大、ドラッグで移動。";
+    note.textContent = "地図の空いているところをクリックすると、その周辺が狙う領域になります。"
+      + "同じ範囲をもう一度押すと、範囲が半分に絞られます。ホイールで拡大、ドラッグで移動。";
   }
   const btn = $("c-visualize");
-  if (btn){
-    btn.disabled = !sel;
-  }
+  if (btn) btn.disabled = !rows.length;
   // 領域を選んだら、その目標の立体を側面に出す
   const view = $("sideview");
   if (view){
-    view.hidden = !sel;
-    if (sel){
+    view.hidden = !rows.length;
+    if (rows.length){
       render3D($("side3d"));
-      $("side3d-badge").textContent =
-        `${AX[sel.xk].name} ${fmt(sel.cx)} ／ ${AX[sel.yk].name} ${fmt(sel.cy)}`;
+      $("side3d-badge").textContent = rows.map(([, k, r]) => `${AX[k].name} ${fmt(r.c)}`).join(" ／ ");
     }
   }
 }
 
-function pickRegion(i, j){
-  const [xk, yk] = conceptAxes(), N = +$("c-grid").value;
-  const e = k => 1 + k * 4 / N, half = 2 / N;
-  const cx = snap((e(i) + e(i + 1)) / 2), cy = snap((e(j) + e(j + 1)) / 2);
-  state.region = { i, j, n:N, xk, yk, cx, cy,
-                   x0:cx - half, x1:cx + half, y0:cy - half, y1:cy + half };
-  state.goal[xk] = cx; state.goal[yk] = cy;
+/* 数値を日本語に置き直した3行 */
+function regionSentences(rows, n0){
+  const L = [];
+  L.push(`市場の重心は ${rows.map(([, k, , m]) => `${AX[k].name} ${fmt(Math.round(m * 10) / 10)}`).join("／")} のあたりにあります。`);
+  L.push(`狙うのは ${rows.map(([, k, r]) => {
+    const a = AX[k], hi = r.c > 3;
+    return `${a.name}が${fmt(r.lo)}〜${fmt(r.hi)}（${hi ? (a.high || "高") : (a.low || "低")}寄り）`;
+  }).join("、")} の範囲です。`);
+  L.push(n0 === 0
+    ? "この範囲に競合はいません。空いている場所を取りにいく案になります。"
+    : `この範囲には競合が${n0}件います。近い相手と、どこで違いを出すかを決める必要があります。`);
+  return L.join("<br>");
+}
+
+/* 狙う領域は軸ごとに持つ。押すたびに範囲が半分に絞られ、
+   軸ごとに指定を外せる。 */
+function pickRegion(vx, vy){
+  const [xk, yk] = conceptAxes();
+  const r = state.region && state.region.xk === xk && state.region.yk === yk ? state.region : null;
+  const inX = !r || !r.x || (vx >= r.x.lo && vx <= r.x.hi);
+  const inY = !r || !r.y || (vy >= r.y.lo && vy <= r.y.hi);
+  const inside = !!r && (r.x || r.y) && inX && inY;
+  const lvl = inside ? Math.min(4, r.lvl + 1) : 1;
+  const half = (2 / CONCEPT_N) / Math.pow(2, lvl - 1);
+  const mk = v => { const c = snap(v); return { lo:Math.max(1, c - half), hi:Math.min(5, c + half), c }; };
+  state.region = { lvl, xk, yk,
+    x: inside && !r.x ? null : mk(vx),
+    y: inside && !r.y ? null : mk(vy) };
+  applyRegion();
+  drawAll();
+}
+function applyRegion(){
+  const r = state.region; if (!r) return;
+  if (r.x) state.goal[r.xk] = r.x.c;
+  if (r.y) state.goal[r.yk] = r.y.c;
+}
+function clearRegionAxis(which){
+  const r = state.region; if (!r) return;
+  r[which] = null;
+  if (!r.x && !r.y) state.region = null;
   drawAll();
 }
 
@@ -2763,7 +2815,9 @@ function drawAdvice(){
   L.push(`市場：${items.length}件。最も混んでいるのは「${crowd ? crowd[0] : "─"}」（${crowd ? crowd[1] : 0}件）。`);
   if (state.region){
     const r = state.region;
-    L.push(`狙う領域：${AX[r.xk].name} ${fmt(r.x0)}〜${fmt(r.x1)}／${AX[r.yk].name} ${fmt(r.y0)}〜${fmt(r.y1)}`);
+    const seg = [[r.xk, r.x], [r.yk, r.y]].filter(e => e[1])
+      .map(([k, e]) => `${AX[k].name} ${fmt(e.lo)}〜${fmt(e.hi)}`);
+    if (seg.length) L.push(`狙う領域：${seg.join("／")}`);
   }
   L.push("");
   L.push("【伸ばす】");
@@ -3245,8 +3299,12 @@ function aiPrompt(){
     + `／${a.engine === "pixel" ? "画像で表現できる項目" : "構造の項目（画像では表せない）"}`));
   L.push("");
   L.push(`市場コーパス：${items.length}件（${[...new Set(items.map(it => it.cat))].join("、")}）`);
-  if (state.region) L.push(`狙う領域：${AX[state.region.xk].name} ${fmt(state.region.x0)}〜${fmt(state.region.x1)}`
-    + `／${AX[state.region.yk].name} ${fmt(state.region.y0)}〜${fmt(state.region.y1)}`);
+  if (state.region){
+    const r = state.region;
+    const seg = [[r.xk, r.x], [r.yk, r.y]].filter(e => e[1])
+      .map(([k, e]) => `${AX[k].name} ${fmt(e.lo)}〜${fmt(e.hi)}`);
+    if (seg.length) L.push(`狙う領域：${seg.join("／")}`);
+  }
   L.push("");
   L.push("【設計指示書】");
   L.push($("brief").value);
@@ -3409,8 +3467,6 @@ $("map").addEventListener("drop", e => {
   if (f.length) addImagesToCorpus(f);
 });
 
-$("c-grid").addEventListener("change", () => { state.region = null; drawAll(); });
-$("c-clear").addEventListener("click", () => { state.region = null; drawAll(); });
 $("c-visualize").addEventListener("click", () => { setVis("3d"); setTab("visual"); });
 /* 3D の視点 */
 $("yaw").addEventListener("input", e => { state.yaw = +e.target.value; render3D(); });
