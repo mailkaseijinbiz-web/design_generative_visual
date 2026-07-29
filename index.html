@@ -39,7 +39,7 @@ h2 .ic,h3 .ic{width:15px; height:15px; opacity:.55}
 .ic-lg{width:18px; height:18px}
 html,body{height:100%}
 body{
-  margin:0; background:var(--paper); color:var(--ink);
+  margin:0; display:flex; flex-direction:column; background:var(--paper); color:var(--ink);
   font-family:var(--font-ui); font-size:14px; line-height:1.6;
   -webkit-font-smoothing:antialiased;
 }
@@ -98,9 +98,9 @@ button{cursor:pointer}
 /* ── 面の構成 ── */
 .deck{
   display:grid; grid-template-columns:minmax(300px,336px) minmax(0,1fr);
-  align-items:stretch; min-height:calc(100vh - 92px);
+  align-items:stretch; flex:1 1 auto; min-height:0;
 }
-.panel{display:flex; flex-direction:column; min-width:0}
+.panel{display:flex; flex-direction:column; min-width:0; min-height:0}
 .deck.no-rail{grid-template-columns:minmax(0,1fr)}
 .deck.no-rail .panel.ledger{display:none}
 .panel.ledger{background:var(--sub); border-right:1px solid var(--line)}
@@ -110,11 +110,11 @@ button{cursor:pointer}
 }
 .panel-head h2{margin:0; font-size:15px; font-weight:600; display:flex; align-items:center; gap:7px; white-space:nowrap}
 .panel-head .cap{font-size:12px; color:var(--ink-3)}
-.panel-body{padding:6px 18px 24px; overflow:auto; flex:1 1 auto}
+.panel-body{padding:6px 18px 24px; overflow:auto; flex:1 1 auto; min-height:0}
 .pane{display:none; flex-direction:column; min-height:0; flex:1 1 auto}
 .pane.on{display:flex; animation:pane-in .16s ease}
 @keyframes pane-in{from{opacity:0; transform:translateY(4px)} to{opacity:1; transform:none}}
-.pane-body{padding:6px 20px 26px; overflow:auto; flex:1 1 auto; display:flex; flex-direction:column; gap:16px}
+.pane-body{padding:6px 20px 26px; overflow:auto; flex:1 1 auto; min-height:0; display:flex; flex-direction:column; gap:16px}
 
 /* ── 切替（セグメント） ── */
 .modeswitch{display:flex; gap:2px; background:var(--sunk); padding:2px; border-radius:7px}
@@ -216,7 +216,7 @@ button{cursor:pointer}
 .parts i{width:10px; height:10px; border-radius:3px}
 
 /* ── 調査 ── */
-.mapbar{display:flex; gap:10px; align-items:center; flex-wrap:wrap; font-size:12.5px; color:var(--ink-2)}
+.mapbar{display:flex; gap:9px 12px; align-items:center; flex-wrap:wrap; font-size:12.5px; color:var(--ink-2)}
 .mapbar label{display:inline-flex; align-items:center; gap:5px}
 .mapbar input[type=range]{width:96px; accent-color:var(--now)}
 .keyfield{flex:1 1 260px; min-width:200px; background:var(--surface); border:1px solid var(--line);
@@ -230,10 +230,39 @@ button{cursor:pointer}
 }
 .mapbar select:hover{border-color:var(--ink-3)}
 .mapbar select:focus{border-color:var(--now); outline:none; box-shadow:0 0 0 2px var(--tint-now)}
-.maprow{display:block}
-#map{width:100%; height:auto; max-height:calc(100vh - 250px); background:var(--surface);
-     user-select:none; -webkit-user-select:none; touch-action:none; cursor:grab;
-     border:1px solid var(--line-soft); border-radius:8px}
+/* 地図は面いっぱいに敷き、操作はその上に浮かせる */
+.pane.full{padding:0}
+.mapstage{position:relative; flex:1 1 auto; min-height:0; overflow:hidden; background:var(--surface)}
+.mapui{position:absolute; z-index:5}
+.mapui.tl{top:12px; left:12px; max-width:calc(100% - 90px); display:flex; flex-direction:column; gap:8px}
+.mapui.tl.narrow{max-width:calc(100% - 384px)}
+.mapui.br{right:14px; bottom:86px}
+.floatcard{
+  background:var(--surface); border:1px solid var(--line-soft); border-radius:10px;
+  box-shadow:0 1px 3px rgba(15,15,15,.10), 0 6px 18px rgba(15,15,15,.09); padding:8px 12px;
+}
+.floatcard.region{padding:10px 14px; max-width:640px}
+.floatcard.region p{margin:0 0 8px; font-size:13px; color:var(--ink-2)}
+.zoomstack{display:flex; flex-direction:column; gap:0; border-radius:8px; overflow:hidden;
+  box-shadow:0 1px 3px rgba(15,15,15,.12), 0 4px 12px rgba(15,15,15,.10)}
+.zoomstack .btn{border-radius:0; border-width:0; padding:8px 9px; background:var(--surface)}
+.zoomstack .btn:first-child{border-bottom:1px solid var(--line-soft)}
+.zoomstack .btn:hover{box-shadow:none; background:var(--hover)}
+.zoomstack .ic{width:18px; height:18px}
+/* 右に立てる助言パネル */
+.mappanel{
+  position:absolute; z-index:5; top:12px; right:12px; bottom:14px; width:352px;
+  display:flex; flex-direction:column; background:var(--surface);
+  border:1px solid var(--line-soft); border-radius:10px;
+  box-shadow:0 1px 3px rgba(15,15,15,.10), 0 6px 18px rgba(15,15,15,.09);
+}
+.mappanel-head{padding:12px 16px 8px; border-bottom:1px solid var(--line-soft)}
+.mappanel-head h2{margin:0; font-size:14.5px; font-weight:600; display:flex; align-items:center; gap:7px}
+.mappanel-head .cap{font-size:12px; color:var(--ink-3)}
+.mappanel-body{padding:12px 16px 18px; overflow:auto; flex:1 1 auto; min-height:0}
+.mappanel-body .hint{margin-bottom:10px}
+#map{position:absolute; inset:0; width:100%; height:100%; background:var(--surface);
+     user-select:none; -webkit-user-select:none; touch-action:none; cursor:grab; display:block}
 .heatkey{display:flex; align-items:center; gap:5px; font-size:11.5px; color:var(--ink-2)}
 .heatkey i{width:64px; height:8px; border-radius:2px; flex:0 0 auto}
 
@@ -296,6 +325,13 @@ svg text{font-family:var(--font-ui)}
 .saved li em{font-style:normal; color:var(--ink-3); font-size:12px; flex:1 1 auto; min-width:0}
 .saved li .btn{padding:2px 8px; font-size:12px}
 
+@media (max-width:1100px){
+  .mappanel{position:static; width:auto; max-height:46vh; margin:0; border-radius:0;
+    border-left:0; border-right:0; border-bottom:0; box-shadow:none}
+  .mapstage{display:flex; flex-direction:column}
+  .mapstage #map{position:relative; inset:auto; flex:1 1 auto; min-height:300px}
+  .mapui.tl.narrow{max-width:calc(100% - 24px)}
+}
 @media (max-width:1180px){
   .deck{grid-template-columns:minmax(0,1fr)}
   .panel.ledger{border-right:0; border-bottom:1px solid var(--line-soft)}
@@ -345,66 +381,67 @@ svg text{font-family:var(--font-ui)}
   <section class="panel work">
 
   <!-- ① 調査 -->
-  <div class="pane" id="pane-research" role="tabpanel" aria-label="調査">
-    <div class="panel-head">
-      <h2 data-ic="search">市場マップ</h2>
-    </div>
-    <div class="pane-body">
-      <div class="mapbar">
-        <label>横軸 <select id="map-x"></select></label>
-        <label>縦軸 <select id="map-y"></select></label>
-        <label>奥行き <select id="map-z"></select></label>
-        <span class="heatkey" id="heatkey"><span>密度</span><i></i><span>少</span><span>多</span></span>
-        <label data-ic="photo_size_select_large">サンプルの大きさ
-          <input type="range" id="map-size" min="10" max="72" step="2" value="20" aria-label="サンプル画像の大きさ">
-          <span class="cap" id="map-size-val">20px</span></label>
-        <span class="spacer" style="flex:1 1 auto"></span>
-        <button class="btn mini" id="map-zoom-out" aria-label="縮小" data-ic="zoom_out"></button>
-        <button class="btn mini" id="map-zoom-in" aria-label="拡大" data-ic="zoom_in"></button>
-        <input type="file" id="corpus-file" accept="image/*" multiple hidden>
+  <div class="pane full" id="pane-research" role="tabpanel" aria-label="調査">
+    <div class="mapstage" id="maprow">
+      <svg id="map" viewBox="0 0 760 470" role="img" aria-label="競合の分布図"></svg>
+      <div class="mapui tl">
+        <div class="mapbar floatcard">
+          <label>横軸 <select id="map-x"></select></label>
+          <label>縦軸 <select id="map-y"></select></label>
+          <label>奥行き <select id="map-z"></select></label>
+          <span class="heatkey" id="heatkey"><span>密度</span><i></i><span>少</span><span>多</span></span>
+          <label data-ic="photo_size_select_large">サンプルの大きさ
+            <input type="range" id="map-size" min="10" max="72" step="2" value="20" aria-label="サンプル画像の大きさ">
+            <span class="cap" id="map-size-val">20px</span></label>
+          <input type="file" id="corpus-file" accept="image/*" multiple hidden>
+        </div>
       </div>
-      <div class="maprow" id="maprow">
-        <svg id="map" viewBox="0 0 760 470" role="img" aria-label="競合の分布図"></svg>
+      <div class="mapui br zoomstack">
+        <button class="btn" id="map-zoom-in" aria-label="拡大" data-ic="zoom_in"></button>
+        <button class="btn" id="map-zoom-out" aria-label="縮小" data-ic="zoom_out"></button>
       </div>
     </div>
   </div>
 
   <!-- ② コンセプト -->
-  <div class="pane" id="pane-concept" role="tabpanel" aria-label="コンセプト">
-    <div class="panel-head">
-      <h2 data-ic="lightbulb">伸ばす項目の助言</h2>
-      <span class="cap" id="concept-cap">─</span>
-    </div>
-    <div class="pane-body">
-      <div class="mapbar">
-        <label>横軸 <select id="c-x"></select></label>
-        <label>縦軸 <select id="c-y"></select></label>
-        <label>グリッド <select id="c-grid">
-          <option value="2">2×2</option><option value="3">3×3</option>
-          <option value="4" selected>4×4</option><option value="5">5×5</option>
-          <option value="6">6×6</option></select></label>
-        <span class="spacer" style="flex:1 1 auto"></span>
-        <button class="btn mini" id="c-clear" data-ic="close">領域の指定を外す</button>
-      </div>
-      <div class="maprow" id="cmap-slot"></div>
-      <p class="hint" id="c-region"></p>
-      <div class="row">
-        <button class="btn primary" id="c-visualize" disabled data-ic="view_in_ar">この領域で可視化する</button>
-        <span class="cap" id="c-visualize-note"></span>
-      </div>
-      <div class="block" style="margin:0">
-        <h3 data-ic="lightbulb">伸ばす項目</h3>
-        <p class="hint" style="margin-bottom:10px">用途文脈での重要度 × 市場の空き × 伸びしろ の積で並べています。</p>
-        <div class="advice" id="advice"></div>
-      </div>
-      <div class="block">
-        <h3 data-ic="edit_note">コンセプト文</h3>
-        <textarea class="brief" id="concept-text" spellcheck="false" aria-label="コンセプト文" style="min-height:130px"></textarea>
-        <div class="row" style="margin-top:8px">
-          <button class="btn mini" id="btn-adopt-all" data-ic="check_circle">上位3項目をまとめて目標に採用</button>
-          <button class="btn mini" id="btn-copy-concept" data-ic="content_copy">コンセプト文をコピー</button>
+  <div class="pane full" id="pane-concept" role="tabpanel" aria-label="コンセプト">
+    <div class="mapstage" id="cmap-slot">
+      <div class="mapui tl narrow">
+        <div class="mapbar floatcard">
+          <label>横軸 <select id="c-x"></select></label>
+          <label>縦軸 <select id="c-y"></select></label>
+          <label>グリッド <select id="c-grid">
+            <option value="2">2×2</option><option value="3">3×3</option>
+            <option value="4" selected>4×4</option><option value="5">5×5</option>
+            <option value="6">6×6</option></select></label>
+          <button class="btn mini" id="c-clear" data-ic="close">領域の指定を外す</button>
+        </div>
+        <div class="floatcard region">
+          <p id="c-region"></p>
+          <div class="row">
+            <button class="btn primary" id="c-visualize" disabled data-ic="view_in_ar">この領域で可視化する</button>
+            <span class="cap" id="c-visualize-note"></span>
+          </div>
         </div>
       </div>
+      <aside class="mappanel" id="concept-panel">
+        <div class="mappanel-head">
+          <h2 data-ic="lightbulb">伸ばす項目の助言</h2>
+          <span class="cap" id="concept-cap">─</span>
+        </div>
+        <div class="mappanel-body">
+          <p class="hint">用途文脈での重要度 × 市場の空き × 伸びしろ の積で並べています。</p>
+          <div class="advice" id="advice"></div>
+          <div class="block" style="margin:16px 0 0">
+            <h3 data-ic="edit_note">コンセプト文</h3>
+            <textarea class="brief" id="concept-text" spellcheck="false" aria-label="コンセプト文" style="min-height:120px"></textarea>
+            <div class="row" style="margin-top:8px">
+              <button class="btn mini" id="btn-adopt-all" data-ic="check_circle">上位3項目をまとめて採用</button>
+              <button class="btn mini" id="btn-copy-concept" data-ic="content_copy">コピー</button>
+            </div>
+          </div>
+        </div>
+      </aside>
     </div>
   </div>
 
@@ -1791,7 +1828,26 @@ function clusterItems(items, K = 4){
 /* ── マップ ──
    軸は1〜3項目まで選べる。1つなら帯、2つなら平面、3つなら立体。
    密度（ヒートマップ）は逐次配色（青一色・淡→濃）。 */
-const MAP_W = 760, MAP_H = 470, PAD = { L:70, R:26, T:26, B:66 };
+let MAP_W = 760, MAP_H = 470;
+const PAD = { L:70, R:26, T:26, B:66 };
+/* 地図は器いっぱいに敷く。器の実寸をそのまま内部座標にするので、
+   縦横比が崩れず、画面を広げた分だけ地図が広くなる。 */
+function fitMapSize(svg){
+  const host = svg.parentNode;
+  if (!host || !host.getBoundingClientRect) return;
+  const r = host.getBoundingClientRect();
+  if (r.width < 80 || r.height < 80) return;
+  MAP_W = Math.round(r.width); MAP_H = Math.round(r.height);
+  const panel = state.tab === "concept" && $("concept-panel");
+  const pw = panel && panel.offsetParent ? panel.getBoundingClientRect().width + 24 : 0;
+  PAD.L = 76; PAD.T = 76; PAD.B = 74; PAD.R = Math.max(30, pw);
+  svg.setAttribute("viewBox", `0 0 ${MAP_W} ${MAP_H}`);
+  const clip = svg.querySelector("#map-clip rect");
+  if (clip){
+    clip.setAttribute("width", MAP_W - PAD.L - PAD.R);
+    clip.setAttribute("height", MAP_H - PAD.T - PAD.B);
+  }
+}
 const HEAT = ["#cde2fb","#b7d3f6","#9ec5f4","#86b6ef","#6da7ec","#5598e7","#3987e5","#256abf"];
 const HEAT_N = 12;
 
@@ -1929,7 +1985,7 @@ function drawMap(){
   const ks = mapAxes();
   const svg = $("map");
   const slot = $(state.tab === "concept" ? "cmap-slot" : "maprow");
-  if (slot && svg.parentNode !== slot) slot.appendChild(svg);
+  if (slot && svg.parentNode !== slot) slot.insertBefore(svg, slot.firstChild);
   if (!svg.dataset.ready){
     svg.insertAdjacentHTML("afterbegin",
       `<defs><clipPath id="map-clip"><rect x="${PAD.L}" y="${PAD.T}" `
@@ -1942,6 +1998,7 @@ function drawMap(){
     svg.dataset.ready = "1";
     bindMap(svg);
   }
+  fitMapSize(svg);
   svg.querySelector("#map-layer").innerHTML =
     ks.length >= 3 ? mapScene3D(ks, items) : mapScene2D(ks, items);
   svg.querySelector("#map-grid").innerHTML =
@@ -3153,6 +3210,13 @@ $("map-zoom-out").addEventListener("click", () => mapZoom(1 / 1.35));
 /* ボタンを置かない代わりに、地図そのもので受ける。
    ダブルクリックで表示を戻し、画像を落とすとコーパスに入る。 */
 $("map").addEventListener("dblclick", mapReset);
+let mapFitTimer = 0;
+window.addEventListener("resize", () => {
+  clearTimeout(mapFitTimer);
+  mapFitTimer = setTimeout(() => {
+    if (state.tab === "research" || state.tab === "concept") drawMap();
+  }, 120);
+});
 $("corpus-file").addEventListener("change", e => { addImagesToCorpus(e.target.files); e.target.value = ""; });
 ["dragenter", "dragover"].forEach(t =>
   $("map").addEventListener(t, e => { e.preventDefault(); e.dataTransfer.dropEffect = "copy"; }));
