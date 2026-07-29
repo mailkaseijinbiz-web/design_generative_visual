@@ -3359,7 +3359,9 @@ function genSourceJPEG(){
 }
 
 /* 生成の実体。画面のどこから呼んでも同じ経路を通る。 */
-async function genImage(key, model, prompt, data, mime){
+const genImage = (key, model, prompt, data, mime) =>
+  genImageMulti(key, model, prompt, [{ mime_type:mime, data }]);
+async function genImageMulti(key, model, prompt, imgs){
   const res = await fetch(
     `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`,
     { method:"POST",
@@ -3367,7 +3369,7 @@ async function genImage(key, model, prompt, data, mime){
       body: JSON.stringify({
         contents: [{ role:"user", parts: [
           { text: prompt },
-          { inline_data: { mime_type: mime, data } }
+          ...imgs.map(im => ({ inline_data: im }))
         ]}]
       }) });
   if (!res.ok){
@@ -3406,12 +3408,37 @@ async function runNanoBanana(){
   } finally { btn.disabled = false; }
 }
 
-/* コンセプトの側面：狙う領域の立体を、Nano Banana に写真として描き直させる */
-function sideGenPrompt(){
+/* コンセプトの側面：狙う位置に近い実物の写真を参考にして描かせる。
+   簡略化した立体ではなく、同じ市場に実在する写真を手本にする。 */
+function sideRefs(n){
+  const r = state.region; if (!r) return [];
+  const [xk, yk] = conceptAxes();
+  const tx = r.x ? r.x.c : 3, ty = r.y ? r.y.c : 3;
+  return visibleCorpus()
+    .filter(it => it.imgId)
+    .map(it => ({ it, d: Math.hypot((it.p[xk] - tx) * (r.x ? 1 : 0), (it.p[yk] - ty) * (r.y ? 1 : 0))
+                     + profDist(it.p, state.goal) * .001 }))
+    .sort((a, b) => a.d - b.d)
+    .slice(0, n)
+    .map(e => e.it);
+}
+function sideGenPrompt(refs){
   const id = state.preset || "chair", p = PRESETS.find(x => x.id === id), r = state.region;
+  const [xk, yk] = conceptAxes();
   const L = [];
-  L.push(`この画像は、狙っている${p ? p.name : "製品"}の姿を粗いポリゴンで置いたものです。`);
-  L.push("同じ姿勢・同じ構図のまま、実物の写真のような一枚に描き起こしてください。");
+  if (refs.length){
+    L.push(`添付は、いま見ている市場に実在する${p ? p.name : "製品"}の写真です（狙う位置に近い順）。`);
+    refs.forEach((it, i) => {
+      L.push(`・${i + 1}枚目：${AX[xk].name} ${fmt(it.p[xk])}／${AX[yk].name} ${fmt(it.p[yk])}`);
+    });
+    L.push("");
+    L.push(`これらの素材・作り・撮り方を手本にして、**次の位置を狙った新しい${p ? p.name : "製品"}**を1枚描いてください。`);
+    L.push("どれかの複製にはせず、狙う位置のぶんだけ手本からずらすこと。");
+    L.push("被写体は1点、背景は白に近い無地、参考写真と似た画角で。");
+  } else {
+    L.push(`この画像は、狙っている${p ? p.name : "製品"}の姿を粗いポリゴンで置いたものです。`);
+    L.push("同じ姿勢・同じ構図のまま、実物の写真のような一枚に描き起こしてください。");
+  }
   if (p) L.push(`用途文脈：${p.context}`);
   if (r){
     L.push("");
@@ -3420,11 +3447,23 @@ function sideGenPrompt(){
       const a = AX[k], hi = e.c > 3;
       L.push(`・${a.name}：${fmt(e.c)}（${fmt(e.lo)}〜${fmt(e.hi)}／${hi ? (a.high || "高") : (a.low || "低")}寄り）`
         + `／${hi ? (a.bUp || a.up) : (a.bDown || a.down)}`);
+      if (refs.length){
+        const m = refs.reduce((t, it) => t + it.p[k], 0) / refs.length;
+        const dd = Math.round((e.c - m) * 10) / 10;
+        if (Math.abs(dd) >= .3)
+          L.push(`　（手本の平均は ${fmt(Math.round(m * 10) / 10)}。そこから${dd > 0 ? (a.high || "高") : (a.low || "低")}側へ ${fmt(Math.abs(dd))} 動かす）`);
+      }
     });
   }
   L.push("");
   L.push("出力は画像1枚だけ。文字・ロゴ・透かしは入れないこと。実在の商品名やブランドは想起させないこと。");
   return L.join("\n");
+}
+function refBase64(it){
+  const c = CHAIRS.find(x => `ci-${x.id}` === it.imgId);
+  if (!c) return null;
+  const m = /^data:(image\/[a-z+]+);base64,(.+)$/.exec(c.src);
+  return m ? { mime_type:m[1], data:m[2] } : null;
 }
 async function runSideGen(){
   const key = ($("side-key").value || localStorage.getItem(GEN_KEY_STORE) || "").trim();
@@ -3438,12 +3477,18 @@ async function runSideGen(){
   $("side-key").hidden = true; $("side-key").value = "";
   btn.disabled = true; note.textContent = "描いています…";
   try {
-    const data = $("side3d").toDataURL("image/jpeg", .9).split(",")[1];
-    const r = await genImage(key, $("gen-model").value, sideGenPrompt(), data, "image/jpeg");
+    const refs = sideRefs(3);
+    const imgs = refs.map(refBase64).filter(Boolean);
+    const parts = imgs.length
+      ? imgs
+      : [{ mime_type:"image/jpeg", data:$("side3d").toDataURL("image/jpeg", .9).split(",")[1] }];
+    const r = await genImageMulti(key, $("gen-model").value, sideGenPrompt(imgs.length ? refs : []), parts);
     if (r.error){ note.textContent = r.error; return; }
     $("side-img").src = r.url;
     $("side-img").hidden = false; $("side3d").hidden = true; $("side-back").hidden = false;
-    note.textContent = "狙う領域を変えると立体に戻ります。";
+    note.textContent = imgs.length
+      ? `狙う位置に近い実物 ${imgs.length}点（${refs.map(it => it.name).join("・")}）を手本にしています。狙う領域を変えると立体に戻ります。`
+      : "この対象には実写サンプルがないので、立体をもとに描いています。";
   } catch (e) {
     note.textContent = GEN_OFFLINE;
   } finally { btn.disabled = false; }
