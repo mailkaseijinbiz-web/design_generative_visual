@@ -524,9 +524,9 @@ svg text{font-family:var(--font-ui)}
         <div class="row">
           <input type="password" id="gen-key" class="keyfield" placeholder="AIza… （自分のGemini APIキー）" autocomplete="off" spellcheck="false">
           <select id="gen-model" aria-label="モデル">
-            <option value="gemini-2.5-flash-image">Nano Banana（gemini-2.5-flash-image）</option>
-            <option value="gemini-3-pro-image-preview">Nano Banana Pro（gemini-3-pro-image-preview）</option>
-            <option value="imagen-4.0-fast-generate-001">Imagen 4 Fast（約半額・手本なし）</option>
+            <option value="imagen-4.0-fast-generate-001" selected>Imagen 4 Fast（約$0.02/枚・手本なし・探索向き）</option>
+            <option value="gemini-2.5-flash-image">Nano Banana（約$0.04/枚・手本つき）</option>
+            <option value="gemini-3-pro-image-preview">Nano Banana Pro（高品質・仕上げ向き）</option>
           </select>
           <select id="gen-lanes" aria-label="同時に描く枚数">
             <option value="4">同時に4枚（控えめ）</option>
@@ -3658,6 +3658,13 @@ $("gen-auto").checked = autoGenOn();
 $("gen-auto").addEventListener("change", e =>
   localStorage.setItem(AUTOGEN_STORE, e.target.checked ? "1" : "0"));
 syncGenCount();
+const GEN_MODEL_STORE = "kansei-morph.gen-model";
+{
+  const saved = localStorage.getItem(GEN_MODEL_STORE);
+  if (saved && [...$("gen-model").options].some(o => o.value === saved))
+    $("gen-model").value = saved;
+}
+$("gen-model").addEventListener("change", e => localStorage.setItem(GEN_MODEL_STORE, e.target.value));
 $("gen-key").value = localStorage.getItem(GEN_KEY_STORE) || "";
 $("gen-key").addEventListener("change", e => {
   const v = e.target.value.trim();
