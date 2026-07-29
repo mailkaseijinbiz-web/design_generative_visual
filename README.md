@@ -112,12 +112,14 @@ Amazonや一般の画像検索からの収集は規約上ここからは踏み�
 ## 設定
 
 - **2次元／3次元** — 地図を平面で見るか立体で見るか。既定は2次元。3次元にすると、ばらつきの大きい未使用の項目が自動で奥行きに入り、地図をドラッグして回せるようになる。
-- **Gemini APIキー**、**モデル**（Nano Banana / Nano Banana Pro）、**同時に描く枚数**、**目標を置いたら自動で描く**（既定OFF）。
+- **Gemini APIキー**、**モデル**、**同時に描く枚数**、**目標を置いたら自動で描く**（既定OFF）。
+- モデルは3つ。**Nano Banana**（約$0.04/枚・手本つき・標準）、**Nano Banana Pro**（高品質・数倍高い・仕上げ向き）、**Imagen 4 Fast**（約$0.02/枚・**手本画像を渡せない**ので市場との地続き感は落ちる・探索向き）。同じキーでそのまま切り替えられる。安く回すなら、探索は Imagen 4 Fast か Nano Banana、仕上げの数枚だけ Pro。
 - **この端末で描いた枚数と概算額**（Nano Banana換算・$0.04/枚の目安）がここに出る。料金の実額はGoogle AI Studioの請求画面が正。Nano Banana Pro は1枚あたり数倍高いので、仕上げの数枚だけに使うのが安い。
 
 ### AI画像生成について
 
-- 叩くのは `https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent`。モデルは **Nano Banana（`gemini-2.5-flash-image`）** と **Nano Banana Pro（`gemini-3-pro-image-preview`）** から選ぶ。Googleが名前を変えたら、`index.html` の `#gen-model` の `<option value>` を書き換えれば追従できる。
+- Nano Banana系は `models/{model}:generateContent`、Imagenは `models/{model}:predict` を叩く。モデルは **Nano Banana（`gemini-2.5-flash-image`）**・**Nano Banana Pro（`gemini-3-pro-image-preview`）**・**Imagen 4 Fast（`imagen-4.0-fast-generate-001`）** から選ぶ。Googleが名前を変えたら、`index.html` の `#gen-model` の `<option value>` を書き換えれば追従できる。
+- キーがAI Studioの**無料ティア**なら、日次の無料枠内は課金されない。枠と実額はAI Studioの請求画面で確認する。
 - 正方形は `generationConfig.imageConfig.aspectRatio = "1:1"` で指定する。対応しないモデルに当たった場合（HTTP 400）は、その指定を外して一度だけ投げ直す。
 - **Nano Banana Pro では出力解像度を最安の1Kに固定**（`imageSize:"1K"`）。Proは出力が4Kだと1K/2Kの約2倍かかる。Nano Banana は解像度によらず1枚定額（約$0.04）なので指定しない。手本として送る参照画像の解像度は料金にほぼ影響しない（1枚あたり$0.001未満）。
 - **受け取った画像は512pxに縮小して持つ**（`GEN_KEEP_PX`）。APIの出力は1Kが下限の定額なので縮めても料金は変わらないが、1枚約2MB→約50KBになり、25枚並べてもページが重くならない。地図の表示は最大180px、右パネルも2倍画素で700px弱なので、見た目は変わらない。

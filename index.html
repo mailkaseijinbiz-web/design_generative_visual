@@ -526,6 +526,7 @@ svg text{font-family:var(--font-ui)}
           <select id="gen-model" aria-label="モデル">
             <option value="gemini-2.5-flash-image">Nano Banana（gemini-2.5-flash-image）</option>
             <option value="gemini-3-pro-image-preview">Nano Banana Pro（gemini-3-pro-image-preview）</option>
+            <option value="imagen-4.0-fast-generate-001">Imagen 4 Fast（約半額・手本なし）</option>
           </select>
           <select id="gen-lanes" aria-label="同時に描く枚数">
             <option value="4">同時に4枚（控えめ）</option>
@@ -3390,12 +3391,16 @@ function sideRefs(n, rg){
     .slice(0, n)
     .map(e => e.it);
 }
-function sideGenPrompt(refs, dir, rg){
+function sideGenPrompt(refs, dir, rg, textOnly){
   const id = state.preset || "chair", p = PRESETS.find(x => x.id === id), r = rg || state.region;
   const [xk, yk] = conceptAxes();
   const L = [];
   const rendered = refs.length && refs.every(it => it.src === "レンダ");
-  if (rendered){
+  if (textOnly){
+    L.push(`「${p ? p.name : "製品"}」の新しいデザイン案を1枚描いてください。`);
+    L.push("実物をスタジオで撮った商品写真のような質感（実在の素材、自然な光と影）。");
+    L.push("被写体は1点、背景は白に近い無地。**正方形（1:1）の画像**にしてください。");
+  } else if (rendered){
     L.push(`添付は、いま見ている市場の${p ? p.name : "製品"}を簡略化した参考レンダリングです（狙う位置に近い順）。`);
     refs.forEach((it, i) => {
       L.push(`・${i + 1}枚目：${AX[xk].name} ${fmt(it.p[xk])}／${AX[yk].name} ${fmt(it.p[yk])}`);
@@ -3450,10 +3455,31 @@ function refBase64(it){
 }
 /* 位置をひとつ渡して、その狙いの姿を1枚描く。側面にも一覧にも同じ道を使う。 */
 async function drawOne(key, rg, dir, nref){
+  const model = $("gen-model").value;
+  // Imagen は手本画像を渡せないぶん安い。指示文だけで描かせる。
+  if (/^imagen/.test(model))
+    return genImagen(key, model, sideGenPrompt([], dir, rg, true));
   const refs = sideRefs(nref || 3, rg);
   const imgs = refs.map(refBase64).filter(Boolean);
   if (!imgs.length) return { error:"この対象には手本にできる写真がありません。" };
-  return genImageMulti(key, $("gen-model").value, sideGenPrompt(refs, dir, rg), imgs, true);
+  return genImageMulti(key, model, sideGenPrompt(refs, dir, rg), imgs, true);
+}
+async function genImagen(key, model, prompt){
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:predict`;
+  const res = await fetch(url, { method:"POST",
+    headers:{ "content-type":"application/json", "x-goog-api-key":key },
+    body: JSON.stringify({ instances:[{ prompt }], parameters:{ sampleCount:1, aspectRatio:"1:1" } }) });
+  if (!res.ok){
+    const tx = await res.text();
+    return { error: res.status === 400 || res.status === 403
+      ? `認証か権限で断られました（${res.status}）。キーで Imagen が使えるかを確かめてください。`
+      : `${res.status}：${tx.slice(0, 300)}` };
+  }
+  const j = await res.json();
+  const pr = (j.predictions || [])[0] || {};
+  const b64 = pr.bytesBase64Encoded || (pr.image || {}).bytesBase64Encoded;
+  if (!b64) return { error:"画像が返りませんでした。" };
+  return { url: await shrinkImage(`data:${pr.mimeType || "image/png"};base64,${b64}`, GEN_KEEP_PX) };
 }
 /* この端末で描いた枚数を数え、概算額とともに設定に出す */
 const GEN_COUNT_STORE = "kansei-morph.gen-count";
