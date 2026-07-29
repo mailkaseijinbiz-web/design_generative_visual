@@ -1424,6 +1424,23 @@ async function searchCommons(q){
 }
 /* Geminiのキーが入っているときだけ、候補を「テーマが主役の画像」に絞る。
    全候補を縮小して1回で渡し、残す番号のJSON配列をもらう。失敗したら絞らずに返す。 */
+/* 商品写真らしさ：外周の色が揃っているほど無地背景＝カタログ調とみなす（0〜1） */
+function productScore(img){
+  const s = 48;
+  const cv = document.createElement("canvas"); cv.width = cv.height = s;
+  const g = cv.getContext("2d"); g.drawImage(img, 0, 0, s, s);
+  const d = g.getImageData(0, 0, s, s).data;
+  const px = [];
+  for (let y = 0; y < s; y++) for (let x = 0; x < s; x++){
+    if (x > 1 && x < s - 2 && y > 1 && y < s - 2) continue;
+    const i = (y * s + x) * 4;
+    px.push([d[i], d[i + 1], d[i + 2]]);
+  }
+  const n = px.length;
+  const m = [0, 1, 2].map(c => px.reduce((tt, q) => tt + q[c], 0) / n);
+  const v = px.reduce((tt, q) => tt + (q[0]-m[0])**2 + (q[1]-m[1])**2 + (q[2]-m[2])**2, 0) / n;
+  return Math.max(0, 1 - Math.sqrt(v) / 90);
+}
 function smallJpeg(img){
   const k = Math.min(1, 160 / Math.max(img.naturalWidth, img.naturalHeight));
   const cv = document.createElement("canvas");
@@ -1437,9 +1454,11 @@ async function filterByTheme(q, cands){
   if (!key || cands.length <= 8) return cands;
   try {
     const parts = [{ text:
-      `画像を番号つきで渡します。「${q}」そのものが主な被写体として写っている番号だけを、`
-      + `JSONの配列（例：[0,2,5]）で返してください。建物・風景・地図・文書・ロゴ・人物が主役のもの、`
-      + `対象が小さくしか写っていないものは除外。配列以外は何も書かないこと。` }];
+      `画像を番号つきで渡します。「${q}」の**商品写真**として使える番号だけを、`
+      + `JSONの配列（例：[0,2,5]）で返してください。`
+      + `残す条件：対象が1点だけ大きく写っていて、背景が無地か簡素（スタジオ・カタログ調）であること。`
+      + `除外：風景・街並み・建物・室内の情景、人物が写るもの、複数の別種のものが並ぶもの、`
+      + `地図・図面・文書・ロゴ、対象の一部分だけの接写。配列以外は何も書かないこと。` }];
     cands.forEach(c => {
       parts.push({ text:`#${c.i}` });
       parts.push({ inline_data: smallJpeg(c.img) });
@@ -1489,8 +1508,13 @@ async function searchTheme(qRaw){
     if (seq !== themeSeq) return;
     if (cands.length < 8) throw new Error("few");
     note.textContent = "選別中…";
-    const kept = await filterByTheme(q, cands);
+    cands.forEach(c => c.ps = productScore(c.img));
+    const judged = await filterByTheme(q, cands);
     if (seq !== themeSeq) return;
+    // 無地背景の順に並べ、キーがないときは情景写真をここで落とす
+    const sorted = judged.slice().sort((a, b) => b.ps - a.ps);
+    const plain = sorted.filter(c => c.ps >= .4);
+    const kept = plain.length >= 8 ? plain : sorted;
     const use = kept.slice(0, N);
     const items = use.map((c, i) => {
       // 実写サンプルと同じ経路：300pxで9項目を推定する
@@ -1513,7 +1537,7 @@ async function searchTheme(qRaw){
     });
     clusterItems(items);
     registerSearchPreset(q, items);
-    const dropped = cands.length - kept.length;
+    const dropped = cands.length - use.length;
     note.textContent = `「${q}」${items.length}枚を配置しました`
       + (dropped > 0 ? `（対象外 ${dropped}枚を除外）`
         : (localStorage.getItem(GEN_KEY_STORE) ? "" : "／Geminiキーを入れると自動選別つき"));
