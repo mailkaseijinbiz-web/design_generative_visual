@@ -236,7 +236,9 @@ button{cursor:pointer}
 .mapui{position:absolute; z-index:5}
 .mapui.tl{top:12px; left:12px; max-width:calc(100% - 90px); display:flex; flex-direction:column; gap:8px}
 .mapui.tl.narrow{max-width:calc(100% - 384px)}
-.mapui.br{right:14px; bottom:86px}
+.mapui.br{right:14px; bottom:86px; display:flex; flex-direction:column; align-items:flex-end; gap:8px}
+.axholder{position:absolute; width:0; height:0; overflow:hidden; opacity:0; pointer-events:none}
+.sizepop{display:flex; align-items:center; gap:10px; white-space:nowrap; padding:6px 11px}
 .floatcard{
   background:var(--surface); border:1px solid var(--line-soft); border-radius:10px;
   box-shadow:0 1px 3px rgba(15,15,15,.10), 0 6px 18px rgba(15,15,15,.09); padding:8px 12px;
@@ -261,6 +263,13 @@ button{cursor:pointer}
 .mappanel-head .cap{font-size:12px; color:var(--ink-3)}
 .mappanel-body{padding:12px 16px 18px; overflow:auto; flex:1 1 auto; min-height:0}
 .mappanel-body .hint{margin-bottom:10px}
+/* 領域を選んだときに出る、その狙いの立体 */
+.sideview{position:relative; margin:0 0 12px; border-radius:8px; overflow:hidden;
+  border:1px solid var(--line-soft); background:var(--sunk)}
+.sideview canvas{display:block; width:100%; height:auto}
+.sideview .badge{position:absolute; left:8px; top:8px; font-family:var(--font-mono); font-size:10.5px;
+  color:var(--ink-2); background:var(--surface); border:1px solid var(--line-soft);
+  padding:2px 7px; border-radius:5px}
 #map{position:absolute; inset:0; width:100%; height:100%; background:var(--surface);
      user-select:none; -webkit-user-select:none; touch-action:none; cursor:grab; display:block}
 .heatkey{display:flex; align-items:center; gap:5px; font-size:11.5px; color:var(--ink-2)}
@@ -340,6 +349,40 @@ svg text{font-family:var(--font-ui)}
 @media (max-width:760px){
   .variants{grid-template-columns:repeat(3,1fr)}
 }
+/* 軸名のタップ領域 */
+.axtap{cursor:pointer}
+.axtap rect{fill:transparent; transition:fill .12s}
+.axtap:hover rect, .axtap:focus-visible rect{fill:var(--hover)}
+.axtap .caret{opacity:.45}
+.axtap:hover .caret{opacity:.9}
+
+/* 軸を選び直すダイアログ */
+.modal{position:fixed; inset:0; z-index:100; display:grid; place-items:center; padding:20px;
+  background:rgba(15,15,15,.28); animation:pane-in .14s ease}
+.modal-card{
+  width:min(520px, 100%); max-height:min(76vh, 720px); display:flex; flex-direction:column;
+  background:var(--surface); border-radius:12px; padding:16px 18px 18px;
+  box-shadow:0 8px 40px rgba(15,15,15,.22);
+}
+.modal-head{display:flex; align-items:center; justify-content:space-between; gap:12px}
+.modal-head h2{margin:0; font-size:15px; font-weight:600; display:flex; align-items:center; gap:7px}
+.modal-head .btn{padding:4px 6px}
+.modal .hint{margin:10px 0 12px}
+.axlist{display:flex; flex-direction:column; gap:2px; overflow:auto; min-height:0; margin:0 -6px}
+.axopt{
+  display:grid; grid-template-columns:12px minmax(96px,auto) minmax(0,1fr) auto; gap:10px;
+  align-items:center; text-align:left; width:100%;
+  border:0; background:transparent; border-radius:8px; padding:9px 12px;
+  font-size:13px; color:var(--ink); transition:background .12s;
+}
+.axopt:hover:not(:disabled){background:var(--hover)}
+.axopt:disabled{opacity:.4; cursor:default}
+.axopt[aria-pressed="true"]{background:var(--tint-now); font-weight:600}
+.axopt i{width:10px; height:10px; border-radius:50%}
+.axopt .nm{font-weight:600}
+.axopt .po{color:var(--ink-3); font-size:12px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis}
+.axopt .sp{color:var(--ink-2); font-size:11.5px; font-variant-numeric:tabular-nums; white-space:nowrap}
+
 ::-webkit-scrollbar{width:10px; height:10px}
 ::-webkit-scrollbar-thumb{background:rgba(55,53,47,.18); border-radius:5px; border:2px solid transparent; background-clip:content-box}
 ::-webkit-scrollbar-thumb:hover{background:rgba(55,53,47,.32); border-radius:5px; border:2px solid transparent; background-clip:content-box}
@@ -384,21 +427,18 @@ svg text{font-family:var(--font-ui)}
   <div class="pane full" id="pane-research" role="tabpanel" aria-label="調査">
     <div class="mapstage" id="maprow">
       <svg id="map" viewBox="0 0 760 470" role="img" aria-label="競合の分布図"></svg>
-      <div class="mapui tl">
-        <div class="mapbar floatcard">
-          <label>横軸 <select id="map-x"></select></label>
-          <label>縦軸 <select id="map-y"></select></label>
-          <label>奥行き <select id="map-z"></select></label>
-          <span class="heatkey" id="heatkey"><span>密度</span><i></i><span>少</span><span>多</span></span>
-          <label data-ic="photo_size_select_large">サンプルの大きさ
-            <input type="range" id="map-size" min="10" max="72" step="2" value="20" aria-label="サンプル画像の大きさ">
-            <span class="cap" id="map-size-val">20px</span></label>
-          <input type="file" id="corpus-file" accept="image/*" multiple hidden>
-        </div>
+      <div class="axholder">
+        <select id="map-x"></select><select id="map-y"></select><select id="map-z"></select>
+        <input type="file" id="corpus-file" accept="image/*" multiple hidden>
       </div>
-      <div class="mapui br zoomstack">
-        <button class="btn" id="map-zoom-in" aria-label="拡大" data-ic="zoom_in"></button>
-        <button class="btn" id="map-zoom-out" aria-label="縮小" data-ic="zoom_out"></button>
+      <div class="mapui br">
+        <div class="floatcard sizepop" id="sizepop">
+          <span class="heatkey" id="heatkey"><span>密度</span><i></i><span>少</span><span>多</span></span>
+        </div>
+        <div class="zoomstack">
+          <button class="btn" id="map-zoom-in" aria-label="拡大" data-ic="zoom_in"></button>
+          <button class="btn" id="map-zoom-out" aria-label="縮小" data-ic="zoom_out"></button>
+        </div>
       </div>
     </div>
   </div>
@@ -406,10 +446,11 @@ svg text{font-family:var(--font-ui)}
   <!-- ② コンセプト -->
   <div class="pane full" id="pane-concept" role="tabpanel" aria-label="コンセプト">
     <div class="mapstage" id="cmap-slot">
+      <div class="axholder">
+        <select id="c-x"></select><select id="c-y"></select>
+      </div>
       <div class="mapui tl narrow">
         <div class="mapbar floatcard">
-          <label>横軸 <select id="c-x"></select></label>
-          <label>縦軸 <select id="c-y"></select></label>
           <label>グリッド <select id="c-grid">
             <option value="2">2×2</option><option value="3">3×3</option>
             <option value="4" selected>4×4</option><option value="5">5×5</option>
@@ -430,6 +471,10 @@ svg text{font-family:var(--font-ui)}
           <span class="cap" id="concept-cap">─</span>
         </div>
         <div class="mappanel-body">
+          <div class="sideview" id="sideview" hidden>
+            <canvas id="side3d" width="640" height="440"></canvas>
+            <span class="badge" id="side3d-badge">─</span>
+          </div>
           <p class="hint">用途文脈での重要度 × 市場の空き × 伸びしろ の積で並べています。</p>
           <div class="advice" id="advice"></div>
           <div class="block" style="margin:16px 0 0">
@@ -559,6 +604,18 @@ svg text{font-family:var(--font-ui)}
 
   </section>
 </main>
+
+<!-- 軸を選び直すダイアログ -->
+<div class="modal" id="axmodal" hidden>
+  <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="axmodal-title">
+    <div class="modal-head">
+      <h2 id="axmodal-title" data-ic="straighten">軸の項目</h2>
+      <button class="btn mini" id="axmodal-close" data-ic="close" aria-label="閉じる"></button>
+    </div>
+    <p class="hint" id="axmodal-hint"></p>
+    <div class="axlist" id="axmodal-list"></div>
+  </div>
+</div>
 
 <script src="samples/chairs.js"></script>
 <script>
@@ -702,7 +759,7 @@ const state = {
   corpus: {}, catOff: new Set(), advice: [], cands: [], stats: null,
   mapView: { k:1, tx:0, ty:0 }, map3: { yaw:-32, pitch:-18, k:1 },
   mapPos: [], mapHover: null, mapDrag: null, mapDragged: false, region: null,
-  anim: null, spread: {}, thumb: 20
+  anim: null, spread: {}, thumb: 20, mapProj: null, axModal: null
 };
 
 const V = {
@@ -1840,7 +1897,10 @@ function fitMapSize(svg){
   MAP_W = Math.round(r.width); MAP_H = Math.round(r.height);
   const panel = state.tab === "concept" && $("concept-panel");
   const pw = panel && panel.offsetParent ? panel.getBoundingClientRect().width + 24 : 0;
-  PAD.L = 76; PAD.T = 76; PAD.B = 74; PAD.R = Math.max(30, pw);
+  const bar = host.querySelector(".mapui.tl");
+  PAD.L = 76; PAD.B = 74;
+  PAD.T = bar ? Math.min(MAP_H * .42, Math.round(bar.getBoundingClientRect().height) + 26) : 34;
+  PAD.R = Math.max(30, pw);
   svg.setAttribute("viewBox", `0 0 ${MAP_W} ${MAP_H}`);
   const clip = svg.querySelector("#map-clip rect");
   if (clip){
@@ -1978,6 +2038,27 @@ function refreshAxisLabels(){
       + `${flat ? "―" : v.toFixed(1)}</span>`;
   }).join("");
 }
+/* サンプルの大きさは自動で決める。
+   同じ値どうしは小さな格子に並ぶので、隣の塊とぶつからない上限を取る。
+   位置は拡大率込みで計算されているので、拡大すれば自然に大きくなる。 */
+const THUMB_MIN = 11, THUMB_MAX = 92;
+function autoThumb(centres){
+  if (centres.length <= 1) return 72;
+  let lim = THUMB_MAX;
+  centres.forEach((g, i) => {
+    let nd = Infinity, other = null;
+    centres.forEach((h, j) => {
+      if (i === j) return;
+      const d = Math.hypot(g.x - h.x, g.y - h.y);
+      if (d < nd){ nd = d; other = h; }
+    });
+    if (!other || !isFinite(nd)) return;
+    const span = Math.ceil(Math.sqrt(g.n)) + Math.ceil(Math.sqrt(other.n));
+    lim = Math.min(lim, 2 * nd / span * .94);
+  });
+  return Math.max(THUMB_MIN, Math.min(THUMB_MAX, lim));
+}
+
 const heatColor = t => HEAT[Math.min(HEAT.length - 1, Math.max(0, Math.round(t * (HEAT.length - 1))))];
 
 function drawMap(){
@@ -2018,7 +2099,7 @@ function mapScene2D(ks, items){
   const V2 = state.mapView, one = ks.length === 1;
   const x0 = PAD.L, x1 = MAP_W - PAD.R, y0 = PAD.T, y1 = MAP_H - PAD.B;
   const cx = (x0 + x1) / 2, cy = (y0 + y1) / 2;
-  const IN = 22;   // 端の点が枠に食い込まないための余白
+  let IN = 22;     // 端の点が枠に食い込まないための余白（大きさに応じて広げる）
   const bx = v => x0 + IN + (v - 1) / 4 * (x1 - x0 - IN * 2);
   const by = v => y1 - IN - (v - 1) / 4 * (y1 - y0 - IN * 2);
   const px = v => cx + (bx(v) - cx) * V2.k + V2.tx;
@@ -2048,7 +2129,13 @@ function mapScene2D(ks, items){
       if (!groups.has(key)) groups.set(key, []);
       groups.get(key).push(it);
     });
-    const zk = Math.min(2, V2.k), size0 = state.thumb * zk;
+    // 大きさは自動。余白は決まった大きさに合わせて広げ、二度目で確定させる
+    const centres = () => [...groups.values()].map(list => ({
+      x: px(list[0].p[xk]), y: one ? cy : py(list[0].p[yk]), n: list.length
+    }));
+    IN = Math.max(22, Math.min(70, autoThumb(centres()) / 2 + 8));
+    const size0 = autoThumb(centres());
+    state.thumb = size0;
     groups.forEach(list => {
       const cols = one ? 1 : Math.ceil(Math.sqrt(list.length)), rows = Math.ceil(list.length / cols);
       list.forEach((it, i) => {
@@ -2184,14 +2271,14 @@ function mapScene3D(ks, items){
       + `stroke="${soft}" stroke-width="1"/>`;
   });
   // 3本の軸と見出し
-  [[xk, [5,1,1], "横"], [yk, [1,5,1], "縦"], [zk, [1,1,5], "奥行き"]].forEach(([k, end, label]) => {
+  [[xk, [5,1,1], "横", "x"], [yk, [1,5,1], "縦", "y"], [zk, [1,1,5], "奥行き", "z"]].forEach(([k, end, label, which]) => {
     const o = at(1,1,1), e = at(...end);
     s += `<line x1="${o[0].toFixed(1)}" y1="${o[1].toFixed(1)}" x2="${e[0].toFixed(1)}" y2="${e[1].toFixed(1)}" `
       + `stroke="${line}" stroke-width="1.8"/>`;
     const lx = e[0] + (e[0] - o[0]) * .08, ly = e[1] + (e[1] - o[1]) * .08;
-    s += `<rect x="${(lx - 6).toFixed(1)}" y="${(ly - 13).toFixed(1)}" width="${(AX[k].name.length * 12 + 34)}" height="18" rx="3" fill="${paper}" opacity=".9"/>`
-      + `<text x="${lx.toFixed(1)}" y="${ly.toFixed(1)}" font-size="12"  fill="${ink2}">`
-      + `<tspan fill="${ink3}">${label} </tspan><tspan font-weight="600">${AX[k].name}</tspan></text>`;
+    const txt = `${label} ${AX[k].name}`;
+    s += `<rect x="${(lx - 10).toFixed(1)}" y="${(ly - 14).toFixed(1)}" width="${(txt.length * 12 + 30)}" height="20" rx="10" fill="${paper}" opacity=".9"/>`
+      + axisTap(lx + txt.length * 6 + 5, ly, txt, which, ink2);
   });
 
   // 点（奥から手前へ）
@@ -2200,11 +2287,13 @@ function mapScene3D(ks, items){
     const p = at(it.p[xk], it.p[yk], it.p[zk]);
     return { it, x:p[0], y:p[1], z:p[2] };
   }).sort((a, b) => a.z - b.z);
+  const base3 = autoThumb(drawn.map(d => ({ x:d.x, y:d.y, n:1 })));
+  state.thumb = base3;
   drawn.forEach(d => {
     const scale = Math.max(.55, Math.min(1.7, 1 / (dist - d.z) * 3.1)) * M.k;
     const [bx2, by2] = blend(d.it, d.x, d.y);
     pos.push({ it:d.it, x:bx2, y:by2 });
-    s += mapMark(d.it, bx2, by2, pos.length - 1, state.thumb * scale, paper);
+    s += mapMark(d.it, bx2, by2, pos.length - 1, base3 * scale, paper);
   });
   state.mapPos = pos;
 
@@ -2301,14 +2390,26 @@ function clusterMarks(items, xk, yk, px, py, box, paper, ink3, avoid){
 }
 
 /* 軸の見出し：中央に項目名、両端に意味 */
+/* 軸名は押せる。押すと項目を選び直すダイアログが開く */
+function axisTap(cx, cy, name, which, ink2, rot){
+  const w = name.length * 13.5 + 38, h = 24;
+  const x = cx - w / 2, y = cy - 17;
+  return `<g class="axtap" data-ax="${which}" role="button" tabindex="0" `
+    + `aria-label="${name} の軸を変える"${rot ? ` transform="${rot}"` : ""}>`
+    + `<rect x="${x.toFixed(1)}" y="${y.toFixed(1)}" width="${w.toFixed(1)}" height="${h}" rx="12"/>`
+    + `<text x="${(cx - 6).toFixed(1)}" y="${cy.toFixed(1)}" font-size="13" font-weight="600" fill="${ink2}" `
+    + `text-anchor="middle">${name}</text>`
+    + `<path class="caret" d="M${(cx + w / 2 - 17).toFixed(1)} ${(cy - 6).toFixed(1)}l5 6 5-6" `
+    + `fill="none" stroke="${ink2}" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></g>`;
+}
 function axisLabels(ax, ay, x0, x1, y0, y1, ink2, ink3, one){
   const midX = (x0 + x1) / 2, midY = (y0 + y1) / 2, yb = y1 + 38, lx = x0 - 38;
   let s = `<text x="${x0}" y="${yb}" font-size="11.5" fill="${ink3}">${ax.low || "低"}</text>`
-    + `<text x="${midX}" y="${yb}" font-size="13" font-weight="600" fill="${ink2}" text-anchor="middle">${ax.name}</text>`
+    + axisTap(midX, yb, ax.name, "x", ink2)
     + `<text x="${x1}" y="${yb}" font-size="11.5" fill="${ink3}" text-anchor="end">${ax.high || "高"}</text>`;
   if (ay && !one){
     s += `<text transform="rotate(-90 ${lx} ${y1})" x="${lx}" y="${y1}" font-size="11.5" fill="${ink3}">${ay.low || "低"}</text>`
-      + `<text transform="rotate(-90 ${lx} ${midY})" x="${lx}" y="${midY}" font-size="13" font-weight="600" fill="${ink2}" text-anchor="middle">${ay.name}</text>`
+      + axisTap(lx, midY, ay.name, "y", ink2, `rotate(-90 ${lx} ${midY})`)
       + `<text transform="rotate(-90 ${lx} ${y0})" x="${lx}" y="${y0}" font-size="11.5" fill="${ink3}" text-anchor="end">${ay.high || "高"}</text>`;
   }
   return s;
@@ -2392,6 +2493,8 @@ function bindMap(svg){
   };
   svg.addEventListener("click", e => {
     if (state.mapDragged) return;
+    const tap = e.target.closest(".axtap");
+    if (tap){ openAxisModal(tap.dataset.ax); return; }
     const g = e.target.closest("[data-idx]");
     if (g){ useChair(+g.dataset.idx); return; }
     if (state.tab === "concept" && state.mapProj && mapAxes().length === 2){
@@ -2407,6 +2510,10 @@ function bindMap(svg){
     mapPreview(t ? +t.dataset.i : null);
   });
   svg.addEventListener("mouseleave", () => mapPreview(null));
+  svg.addEventListener("keydown", e => {
+    const t = e.target.closest && e.target.closest(".axtap");
+    if (t && (e.key === "Enter" || e.key === " ")){ e.preventDefault(); openAxisModal(t.dataset.ax); }
+  });
   svg.addEventListener("wheel", e => {
     e.preventDefault();
     const [sx, sy] = toSvg(e);
@@ -2416,14 +2523,16 @@ function bindMap(svg){
     e.preventDefault();
     const [sx, sy] = toSvg(e);
     state.mapDrag = { sx, sy, tx:state.mapView.tx, ty:state.mapView.ty,
-                      yaw:state.map3.yaw, pitch:state.map3.pitch };
+                      yaw:state.map3.yaw, pitch:state.map3.pitch, id:e.pointerId };
     state.mapDragged = false;
-    svg.setPointerCapture(e.pointerId);
   });
   svg.addEventListener("pointermove", e => {
     const d = state.mapDrag; if (!d) return;
     const [sx, sy] = toSvg(e);
-    if (Math.abs(sx - d.sx) + Math.abs(sy - d.sy) > 4) state.mapDragged = true;
+    if (!state.mapDragged && Math.abs(sx - d.sx) + Math.abs(sy - d.sy) > 4){
+      state.mapDragged = true;
+      try { svg.setPointerCapture(d.id); } catch {}
+    }
     if (mapAxes().length >= 3){
       state.map3.yaw = d.yaw + (sx - d.sx) * .45;
       state.map3.pitch = Math.max(-70, Math.min(70, d.pitch - (sy - d.sy) * .35));
@@ -2433,7 +2542,9 @@ function bindMap(svg){
     }
     if (state.mapDragged) drawMap();
   });
-  ["pointerup", "pointercancel"].forEach(t => svg.addEventListener(t, () => {
+  ["pointerup", "pointercancel"].forEach(t => svg.addEventListener(t, e => {
+    const d = state.mapDrag;
+    if (d && state.mapDragged) { try { svg.releasePointerCapture(d.id); } catch {} }
     state.mapDrag = null;
     setTimeout(() => state.mapDragged = false, 0);
   }));
@@ -2573,6 +2684,16 @@ function conceptNote(sel, cnt, N, mxv, myv){
     $("c-visualize-note").textContent = sel
       ? `${AX[sel.xk].name} ${fmt(sel.cx)}／${AX[sel.yk].name} ${fmt(sel.cy)} を目標にして形を見ます`
       : "領域を選ぶと押せます";
+  }
+  // 領域を選んだら、その目標の立体を側面に出す
+  const view = $("sideview");
+  if (view){
+    view.hidden = !sel;
+    if (sel){
+      render3D($("side3d"));
+      $("side3d-badge").textContent =
+        `${AX[sel.xk].name} ${fmt(sel.cx)} ／ ${AX[sel.yk].name} ${fmt(sel.cy)}`;
+    }
   }
 }
 
@@ -2856,9 +2977,12 @@ function buildModel(id, P){
 }
 
 /* ── 描画 ── */
-function render3D(){
-  const cvs = $("three"), g = cvs.getContext("2d"), W = cvs.width, H = cvs.height;
+function render3D(target){
+  const cvs = target || $("three");
+  if (!cvs || !cvs.width) return;
+  const g = cvs.getContext("2d"), W = cvs.width, H = cvs.height;
   const P = Object.fromEntries(AXES.map(a => [a.key, state.goal[a.key]]));
+  const main = cvs.id === "three";
   const id = state.preset || "chair";
   const atmos = (P.atmos - 3) / 2, colorK = (P.color - 3) / 2, matter = (P.matter - 1) / 4;
   const modern = (P.image - 3) / 2, surp = (P.surp - 3) / 2;
@@ -2938,6 +3062,7 @@ function render3D(){
     g.putImageData(im, 0, 0);
   }
 
+  if (!main) return;
   const roles = { contact:"接触面（フィット性）", insert:"差替素材（新しい組み合わせ）",
                   control:"操作部（機能性）", detail:"装飾部（形態で増減）", structure:"構造", panel:"面材" };
   const used = [...new Set(faces.map(fc => fc.role))];
@@ -3200,16 +3325,56 @@ $("vis-img").addEventListener("click", () => setVis("img"));
   state.mapView = { k:1, tx:0, ty:0 };
   animateMap();
 }));
-$("map-size").addEventListener("input", e => {
-  state.thumb = +e.target.value;
-  $("map-size-val").textContent = `${state.thumb}px`;
-  drawMap();
-});
 $("map-zoom-in").addEventListener("click", () => mapZoom(1.35));
 $("map-zoom-out").addEventListener("click", () => mapZoom(1 / 1.35));
 /* ボタンを置かない代わりに、地図そのもので受ける。
    ダブルクリックで表示を戻し、画像を落とすとコーパスに入る。 */
 $("map").addEventListener("dblclick", mapReset);
+/* ── 軸名タップ → 項目を選び直すダイアログ ── */
+const AX_LABEL = { x:"横軸", y:"縦軸", z:"奥行き" };
+function axisSelectId(which){
+  return state.tab === "concept" ? ({ x:"c-x", y:"c-y" })[which]
+                                 : ({ x:"map-x", y:"map-y", z:"map-z" })[which];
+}
+function openAxisModal(which){
+  const id = axisSelectId(which), sel = id && $(id);
+  if (!sel || !sel.options.length) return;
+  state.axModal = id;
+  $("axmodal-title").textContent = `${AX_LABEL[which]}の項目`;
+  $("axmodal-hint").textContent =
+    "ばらつきの大きい順に並んでいます。ばらつきのある項目ほど、競合が散らばっていて違いが出る軸です。";
+  $("axmodal-list").innerHTML = [...sel.options].map(o => {
+    const a = AX[o.value], v = state.spread[o.value];
+    const note = !a ? "この軸を使わない"
+      : v == null ? "画像から測れない項目" : v < .05 ? "この対象では差が出ていない" : "";
+    const num = !a ? "" : v == null ? "未測定" : v < .05 ? "―" : v.toFixed(1);
+    return `<button type="button" class="axopt" data-v="${o.value}"${o.disabled ? " disabled" : ""} `
+      + `aria-pressed="${o.value === sel.value}">`
+      + `<i style="background:${o.dataset.tone || "transparent"}"></i>`
+      + `<span class="nm">${a ? a.name : "なし"}</span>`
+      + `<span class="po">${a ? `${a.low || "低"} ←→ ${a.high || "高"}` : note}</span>`
+      + `<span class="sp">${o.disabled ? "他の軸で使用中" : (note && a ? note : num)}</span></button>`;
+  }).join("");
+  $("axmodal").hidden = false;
+  paintIcons($("axmodal"));
+  const first = $("axmodal-list").querySelector(".axopt[aria-pressed='true']:not(:disabled)")
+             || $("axmodal-list").querySelector(".axopt:not(:disabled)");
+  if (first) first.focus();
+}
+function closeAxisModal(){ $("axmodal").hidden = true; state.axModal = null; }
+$("axmodal-close").addEventListener("click", closeAxisModal);
+$("axmodal").addEventListener("click", e => { if (e.target === $("axmodal")) closeAxisModal(); });
+document.addEventListener("keydown", e => {
+  if (e.key === "Escape" && !$("axmodal").hidden) closeAxisModal();
+});
+$("axmodal-list").addEventListener("click", e => {
+  const b = e.target.closest(".axopt"); if (!b || b.disabled) return;
+  const sel = $(state.axModal); if (!sel) return;
+  sel.value = b.dataset.v;
+  sel.dispatchEvent(new Event("change", { bubbles:true }));
+  closeAxisModal();
+});
+
 let mapFitTimer = 0;
 window.addEventListener("resize", () => {
   clearTimeout(mapFitTimer);
