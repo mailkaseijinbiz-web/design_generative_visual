@@ -233,7 +233,6 @@ button{cursor:pointer}
 .mapstage{position:relative; flex:1 1 auto; min-height:0; overflow:hidden; background:var(--surface)}
 .mapui{position:absolute; z-index:5}
 .mapui.tl{top:12px; left:12px; max-width:calc(100% - 90px)}
-.mapui.tl.narrow{max-width:calc(100% - 384px)}
 .mapui.br{right:14px; bottom:86px; display:flex; flex-direction:column; align-items:flex-end; gap:8px}
 .axholder{position:absolute; width:0; height:0; overflow:hidden; opacity:0; pointer-events:none}
 .sizepop{display:flex; align-items:center; gap:10px; white-space:nowrap; padding:6px 11px}
@@ -318,7 +317,6 @@ svg text{font-family:var(--font-ui)}
     border-left:0; border-right:0; border-bottom:0; box-shadow:none}
   .mapstage{display:flex; flex-direction:column}
   .mapstage #map{position:relative; inset:auto; flex:1 1 auto; min-height:300px}
-  .mapui.tl.narrow{max-width:calc(100% - 24px)}
 }
 @media (max-width:1180px){
   .deck{grid-template-columns:minmax(0,1fr)}
@@ -330,11 +328,14 @@ svg text{font-family:var(--font-ui)}
 }
 /* 軸名のタップ領域 */
 .axtap{cursor:pointer}
-.axtap rect{fill:var(--surface); stroke:var(--line); stroke-width:1.2;
-  transition:fill .12s, stroke .12s, filter .12s}
-.axtap:hover rect, .axtap:focus-visible rect{fill:var(--hover); stroke:var(--now);
-  filter:drop-shadow(0 1px 3px rgba(15,15,15,.12))}
-.axtap.muted rect{fill:var(--sunk); stroke-dasharray:5 4}
+.axtap rect{
+  fill:var(--surface); fill-opacity:.9; stroke:var(--line); stroke-width:1.2;
+  backdrop-filter:blur(10px); -webkit-backdrop-filter:blur(10px);
+  transition:fill-opacity .12s, stroke .12s, filter .12s;
+}
+.axtap:hover rect, .axtap:focus-visible rect{fill-opacity:1; stroke:var(--now);
+  filter:drop-shadow(0 1px 4px rgba(15,15,15,.14))}
+.axtap.muted rect{stroke-dasharray:5 4}
 .axtap .caret{opacity:.55}
 .axtap:hover .caret{opacity:1}
 
@@ -432,15 +433,6 @@ svg text{font-family:var(--font-ui)}
       <div class="axholder">
         <select id="c-x"></select><select id="c-y"></select>
       </div>
-      <div class="mapui tl narrow">
-        <div class="mapbar floatcard">
-          <label>グリッド <select id="c-grid">
-            <option value="2">2×2</option><option value="3">3×3</option>
-            <option value="4" selected>4×4</option><option value="5">5×5</option>
-            <option value="6">6×6</option></select></label>
-          <button class="btn mini" id="c-clear" data-ic="close">領域の指定を外す</button>
-        </div>
-      </div>
       <aside class="mappanel" id="concept-panel">
         <div class="mappanel-head">
           <h2 data-ic="lightbulb">狙う領域</h2>
@@ -450,6 +442,13 @@ svg text{font-family:var(--font-ui)}
           <div class="sideview" id="sideview" hidden>
             <canvas id="side3d" width="640" height="440"></canvas>
             <span class="badge" id="side3d-badge">─</span>
+          </div>
+          <div class="mapbar" style="margin:0 0 12px">
+            <label>グリッド <select id="c-grid">
+              <option value="2">2×2</option><option value="3">3×3</option>
+              <option value="4" selected>4×4</option><option value="5">5×5</option>
+              <option value="6">6×6</option></select></label>
+            <button class="btn mini" id="c-clear" data-ic="close">指定を外す</button>
           </div>
           <p class="hint" id="c-region"></p>
           <div class="row" style="margin:0 0 14px">
@@ -1876,7 +1875,7 @@ function fitMapSize(svg){
   const pw = panel && panel.offsetParent ? panel.getBoundingClientRect().width + 24 : 0;
   // 目盛と軸名がある左と下だけ余白を取り、上と右は端まで使う。
   // 浮かせたカードの下は地図が続いている（Googleマップと同じ扱い）。
-  PAD.L = 76; PAD.B = 74; PAD.T = 0; PAD.R = pw;
+  PAD.L = 104; PAD.B = 96; PAD.T = 0; PAD.R = pw;
   svg.setAttribute("viewBox", `0 0 ${MAP_W} ${MAP_H}`);
   const clip = svg.querySelector("#map-clip rect");
   if (clip){
@@ -2213,21 +2212,21 @@ function mapScene2D(ks, items){
 
   // 軸の見出し（項目名と両端の意味）
   let s = `<g clip-path="url(#map-clip)">${plot}</g>`;
-  s += `<rect x="${x0}" y="${y0}" width="${x1-x0}" height="${y1-y0}" fill="none" stroke="${line}" rx="4"/>`;
+  s += `<rect x="${x0}" y="${y0}" width="${x1-x0}" height="${y1-y0}" fill="none" stroke="${line}"/>`;
   [1,2,3,4,5].forEach(v => {
     const tx2 = px(v), ty2 = one ? cy : py(v);
     if (tx2 > x0 - 1 && tx2 < x1 + 1)
-      s += `<text x="${tx2.toFixed(1)}" y="${y1 + 16}" font-size="11" fill="${ink3}" text-anchor="middle" class="mono">${v}</text>`;
+      s += `<text x="${tx2.toFixed(1)}" y="${y1 + 18}" font-size="12" fill="${ink3}" text-anchor="middle" class="mono">${v}</text>`;
     if (!one && ty2 > y0 - 1 && ty2 < y1 + 1)
-      s += `<text x="${x0 - 10}" y="${(ty2 + 4).toFixed(1)}" font-size="11" fill="${ink3}" text-anchor="end" class="mono">${v}</text>`;
+      s += `<text x="${x0 - 12}" y="${(ty2 + 4).toFixed(1)}" font-size="12" fill="${ink3}" text-anchor="end" class="mono">${v}</text>`;
   });
   s += axisLabels(AX[xk], !one && AX[yk], x0, x1, y0, y1, ink2, ink3, one);
   // 使っていない軸も押せるように「なし」で出しておく
-  const midX2 = (x0 + x1) / 2, midY2 = (y0 + y1) / 2, lx2 = x0 - 38;
+  const midX2 = (x0 + x1) / 2, midY2 = (y0 + y1) / 2, lx2 = x0 - 56;
   if (one)
     s += axisTap(lx2, midY2, "縦軸 なし", "y", ink3, `rotate(-90 ${lx2} ${midY2})`, true);
   if (state.tab !== "concept" && $("map-z").value === "-")
-    s += axisTap((midX2 + x1) / 2, y1 + 38, "奥行き なし", "z", ink3, null, true);
+    s += axisTap(x1 - 116, y0 + 38, "奥行き なし", "z", ink3, null, true);
   return s;
 }
 
@@ -2371,26 +2370,29 @@ function clusterMarks(items, xk, yk, px, py, box, paper, ink3, avoid){
 
 /* 軸の見出し：中央に項目名、両端に意味 */
 /* 軸名は押せる。押すと項目を選び直すダイアログが開く */
+const AXTAP_H = 60;
 function axisTap(cx, cy, name, which, ink, rot, muted){
-  const w = name.length * 16 + 52, h = 32;
-  const x = cx - w / 2, y = cy - 22;
+  const w = name.length * 18 + 74, h = AXTAP_H;
+  const x = cx - w / 2, y = cy - h / 2;
   return `<g class="axtap${muted ? " muted" : ""}" data-ax="${which}" role="button" tabindex="0" `
     + `aria-label="${name} の軸を変える"${rot ? ` transform="${rot}"` : ""}>`
-    + `<rect x="${x.toFixed(1)}" y="${y.toFixed(1)}" width="${w.toFixed(1)}" height="${h}" rx="16"/>`
-    + `<text x="${(cx - 9).toFixed(1)}" y="${cy.toFixed(1)}" font-size="16" font-weight="600" fill="${ink}" `
+    + `<rect x="${x.toFixed(1)}" y="${y.toFixed(1)}" width="${w.toFixed(1)}" height="${h}" rx="${h / 2}"/>`
+    + `<text x="${(cx - 11).toFixed(1)}" y="${(cy + 6).toFixed(1)}" font-size="17" font-weight="600" fill="${ink}" `
     + `text-anchor="middle">${name}</text>`
-    + `<path class="caret" d="M${(cx + w / 2 - 25).toFixed(1)} ${(cy - 7).toFixed(1)}l6 7 6-7" `
-    + `fill="none" stroke="${ink}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></g>`;
+    + `<path class="caret" d="M${(cx + w / 2 - 33).toFixed(1)} ${(cy - 3).toFixed(1)}l7 8 7-8" `
+    + `fill="none" stroke="${ink}" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></g>`;
 }
+const AX_EDGE = 34;   // 両極の文字を枠の端から離す量
 function axisLabels(ax, ay, x0, x1, y0, y1, ink2, ink3, one){
-  const midX = (x0 + x1) / 2, midY = (y0 + y1) / 2, yb = y1 + 38, lx = x0 - 38;
-  let s = `<text x="${x0}" y="${yb}" font-size="11.5" fill="${ink3}">${ax.low || "低"}</text>`
+  const midX = (x0 + x1) / 2, midY = (y0 + y1) / 2, yb = y1 + 56, lx = x0 - 56;
+  let s = `<text x="${x0 + AX_EDGE}" y="${yb + 5}" font-size="13.5" fill="${ink3}">${ax.low || "低"}</text>`
     + axisTap(midX, yb, ax.name, "x", ink2)
-    + `<text x="${x1}" y="${yb}" font-size="11.5" fill="${ink3}" text-anchor="end">${ax.high || "高"}</text>`;
+    + `<text x="${x1 - AX_EDGE}" y="${yb + 5}" font-size="13.5" fill="${ink3}" text-anchor="end">${ax.high || "高"}</text>`;
   if (ay && !one){
-    s += `<text transform="rotate(-90 ${lx} ${y1})" x="${lx}" y="${y1}" font-size="11.5" fill="${ink3}">${ay.low || "低"}</text>`
+    const yLo = y1 - AX_EDGE, yHi = y0 + AX_EDGE;
+    s += `<text transform="rotate(-90 ${lx} ${yLo})" x="${lx}" y="${lx > 0 ? yLo : yLo}" font-size="13.5" fill="${ink3}">${ay.low || "低"}</text>`
       + axisTap(lx, midY, ay.name, "y", ink2, `rotate(-90 ${lx} ${midY})`)
-      + `<text transform="rotate(-90 ${lx} ${y0})" x="${lx}" y="${y0}" font-size="11.5" fill="${ink3}" text-anchor="end">${ay.high || "高"}</text>`;
+      + `<text transform="rotate(-90 ${lx} ${yHi})" x="${lx}" y="${yHi}" font-size="13.5" fill="${ink3}" text-anchor="end">${ay.high || "高"}</text>`;
   }
   return s;
 }
