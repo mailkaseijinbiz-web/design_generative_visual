@@ -3521,22 +3521,33 @@ function sideGenPromptEn(rg, dir){
 }
 /* ローカルのA1111互換API（Draw Things の API Server も同じ形）へ投げる */
 async function genLocalSD(prompt){
-  // 空欄なら、このページと同じ配信元へ（tools/localrelay.py で開いたとき用）
-  const base = (($("local-url") || {}).value || "").trim().replace(/\/+$/, "");
-  try {
-    const res = await fetch(base + "/sdapi/v1/txt2img", { method:"POST",
-      headers:{ "content-type":"application/json" },
-      body: JSON.stringify({ prompt,
-        negative_prompt:"text, watermark, logo, people, hands, multiple objects, cluttered background, collage",
-        width:768, height:768, seed:-1 }) });
-    if (!res.ok) return { error:`ローカルAPIに断られました（${res.status}）。起動と --api、CORSの許可を確かめてください。` };
-    const j = await res.json();
-    const b64 = (j.images || [])[0];
-    if (!b64) return { error:"ローカルAPIから画像が返りませんでした。" };
-    return { url: await shrinkImage(`data:image/png;base64,${b64}`, GEN_KEEP_PX) };
-  } catch (_) {
-    return { error:"ローカルAPIに届きませんでした。A1111なら --api --cors-allow-origins=* を付けて起動してください。" };
+  // 入力されたURL → このページと同じ配信元（localrelay） → 既定の7860 の順に試す。
+  // どれかが通ればそれを使うので、URL欄の空け忘れで詰まらない。
+  const typed = (($("local-url") || {}).value || "").trim().replace(/\/+$/, "");
+  const cands = [];
+  if (/^https?:/.test(location.protocol)) cands.push("");
+  if (typed) cands.push(typed);
+  if (typed !== "http://127.0.0.1:7860") cands.push("http://127.0.0.1:7860");
+  let last = null;
+  for (const base of cands){
+    try {
+      const res = await fetch(base + "/sdapi/v1/txt2img", { method:"POST",
+        headers:{ "content-type":"application/json" },
+        body: JSON.stringify({ prompt,
+          negative_prompt:"text, watermark, logo, people, hands, multiple objects, cluttered background, collage",
+          width:768, height:768, seed:-1 }) });
+      if (!res.ok){
+        last = { error:`ローカルAPIに断られました（${res.status}）。Draw Things / A1111 の起動とモデルの読み込みを確かめてください。` };
+        continue;
+      }
+      const j = await res.json();
+      const b64 = (j.images || [])[0];
+      if (!b64){ last = { error:"ローカルAPIから画像が返りませんでした。モデルが読み込まれているか確かめてください。" }; continue; }
+      return { url: await shrinkImage(`data:image/png;base64,${b64}`, GEN_KEEP_PX) };
+    } catch (_) { /* 次の候補へ */ }
   }
+  return last || { error:"ローカルAPIに届きませんでした。①Draw Things の設定で HTTP APIサーバーがON（ポート7860）か、"
+    + "②python3 tools/localrelay.py が動いていて http://127.0.0.1:8787 を開いているか、を確かめてください。" };
 }
 async function drawOne(key, rg, dir, nref){
   const model = $("gen-model").value;
