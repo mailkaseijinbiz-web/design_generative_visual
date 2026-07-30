@@ -302,6 +302,7 @@ button{cursor:pointer}
 @keyframes spin{to{transform:rotate(360deg)}}
 @media (prefers-reduced-motion:reduce){.spin i{animation-duration:2.4s}}
 .gridgen{display:flex; gap:6px; align-items:center; flex-wrap:wrap; margin:0 0 12px}
+#map.hidemkt .mkt{display:none}
 .genauto{display:flex; gap:8px; align-items:flex-start; font-size:12.5px; color:var(--ink-2);
   line-height:1.6; cursor:pointer}
 .genauto input{margin-top:3px; accent-color:var(--now)}
@@ -481,6 +482,7 @@ svg text{font-family:var(--font-ui)}
               <option value="5">5×5（25枚）</option>
             </select>
             <button class="btn mini" id="grid-gen" data-ic="grid_on">一気に描く</button>
+            <button class="btn mini" id="mkt-toggle" data-ic="visibility">市場を隠す</button>
             <span class="cap" id="grid-note"></span>
           </div>
           <div class="sideview" id="sideview" hidden>
@@ -711,6 +713,7 @@ const state = {
   mapView: { k:1, tx:0, ty:0 }, map3: { yaw:-32, pitch:-18, k:1 },
   mapPos: [], mapHover: null, mapDrag: null, mapDragged: false, region: null,
   anim: null, spread: {}, thumb: 20, mapProj: null, axModal: null, dim: "2d", conceptText: "",
+  hideMarket: false,
   genImage: null,
   gallery: []          // 描いた姿は地図に残す
 };
@@ -2107,6 +2110,7 @@ function drawMap(){
     bindMap(svg);
   }
   fitMapSize(svg);
+  svg.classList.toggle("hidemkt", !!state.hideMarket);
   svg.querySelector("#map-layer").innerHTML =
     ks.length >= 3 ? mapScene3D(ks, items) : mapScene2D(ks, items);
   svg.querySelector("#map-grid").innerHTML = ks.length === 2 ? conceptOverlay(items) : "";
@@ -2210,6 +2214,9 @@ function mapScene2D(ks, items){
     }
   }
 
+  // ここまで（密度と空白）は市場の層。一覧表示のときは隠す
+  plot = `<g class="mkt">${plot}</g>`;
+
   // 方眼紙のようなドットグリッド。1〜5の外側にも敷き、拡大に応じて目が細かくなる。
   const perUnit = (x1 - x0) / 4 * V2.k;
   // 方眼は0.1きざみ。縮小して潰れるときだけ間引く。
@@ -2244,8 +2251,9 @@ function mapScene2D(ks, items){
   });
   if (one) plot += `<line x1="${x0}" y1="${cy.toFixed(1)}" x2="${x1}" y2="${cy.toFixed(1)}" stroke="${soft}" stroke-width="1"/>`;
 
-  // 点
-  pos.forEach((p, i) => { plot += mapMark(p.it, p.x, p.y, i, p.size, paper); });
+  // 点（写真）も市場の層に入れる
+  let mk2 = "";
+  pos.forEach((p, i) => { mk2 += mapMark(p.it, p.x, p.y, i, p.size, paper); });
   state.mapPos = pos;
 
   // 市場の重心とばらつき
@@ -2255,7 +2263,7 @@ function mapScene2D(ks, items){
     const mxv = mean(xk), sxv = sd(xk, mxv);
     const myv = one ? 3 : mean(yk), syv = one ? 0 : sd(yk, myv);
     const gxc = px(mxv), gyc = one ? cy : py(myv);
-    plot += `<g pointer-events="none">`
+    mk2 += `<g pointer-events="none">`
       + `<line x1="${(gxc-11).toFixed(1)}" y1="${gyc.toFixed(1)}" x2="${(gxc+11).toFixed(1)}" y2="${gyc.toFixed(1)}" stroke="${paper}" stroke-width="4.5"/>`
       + `<line x1="${gxc.toFixed(1)}" y1="${(gyc-11).toFixed(1)}" x2="${gxc.toFixed(1)}" y2="${(gyc+11).toFixed(1)}" stroke="${paper}" stroke-width="4.5"/>`
       + `<line x1="${(gxc-10).toFixed(1)}" y1="${gyc.toFixed(1)}" x2="${(gxc+10).toFixed(1)}" y2="${gyc.toFixed(1)}" stroke="${mkt}" stroke-width="2.4"/>`
@@ -2270,7 +2278,8 @@ function mapScene2D(ks, items){
   const avoid = [{ x:gx - 14, y:gy - 12, w:118 }];
 
   // クラスタ（ズームアウトしているときだけ、群の範囲と名前を出す）
-  if (!one && V2.k <= CLUSTER_K) plot += clusterMarks(items, xk, yk, px, py, [x0, x1, y0], paper, ink3, avoid);
+  if (!one && V2.k <= CLUSTER_K) mk2 += clusterMarks(items, xk, yk, px, py, [x0, x1, y0], paper, ink3, avoid);
+  plot += `<g class="mkt">${mk2}</g>`;
   plot += `<g pointer-events="none">` + marker(gx, gy, goal, paper) + `</g>`;
 
   // 軸の見出し（項目名と両端の意味）
@@ -3366,6 +3375,7 @@ async function runGridGen(){
     note.textContent = "この升目はすべて描き終わっています。描き直すには、その升目を押してから描き直してください。";
     return;
   }
+  setHideMarket(true);                                 // 一覧に集中できるよう、市場は下げる
   const run = gridRun = { stop:false, done:0, ng:0 };
   setBtn(btn, "cancel", "止める");
   const tick = () => {
@@ -3697,6 +3707,12 @@ $("side-gen").addEventListener("click", runSideGen);
 $("theme-go").addEventListener("click", () => searchTheme($("theme-q").value));
 $("theme-q").addEventListener("keydown", e => { if (e.key === "Enter") searchTheme(e.target.value); });
 $("grid-gen").addEventListener("click", runGridGen);
+function setHideMarket(on){
+  state.hideMarket = on;
+  setBtn($("mkt-toggle"), "visibility", on ? "市場を出す" : "市場を隠す");
+  drawMap();
+}
+$("mkt-toggle").addEventListener("click", () => setHideMarket(!state.hideMarket));
 
 /* 起動 */
 setMode("goal");
