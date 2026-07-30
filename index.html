@@ -2712,10 +2712,11 @@ function conceptOverlay(items){
   if (sel){
     const gx0 = P.px(mxv), gy0 = P.py(myv);
     const tx = P.px(sel.x ? sel.x.c : mxv), ty = P.py(sel.y ? sel.y.c : myv);
-    s += `<line x1="${gx0.toFixed(1)}" y1="${gy0.toFixed(1)}" x2="${tx.toFixed(1)}" y2="${ty.toFixed(1)}" `
+    // 重心から引く破線は市場の層。市場を隠しているときは線も出さない
+    s += `<g class="mkt"><line x1="${gx0.toFixed(1)}" y1="${gy0.toFixed(1)}" x2="${tx.toFixed(1)}" y2="${ty.toFixed(1)}" `
       + `stroke="${paper}" stroke-width="4.5"/>`
       + `<line x1="${gx0.toFixed(1)}" y1="${gy0.toFixed(1)}" x2="${tx.toFixed(1)}" y2="${ty.toFixed(1)}" `
-      + `stroke="${goal}" stroke-width="2" stroke-dasharray="5 3"/>`
+      + `stroke="${goal}" stroke-width="2" stroke-dasharray="5 3"/></g>`
       + `<circle cx="${tx.toFixed(1)}" cy="${ty.toFixed(1)}" r="7" fill="${paper}"/>`
       + `<circle cx="${tx.toFixed(1)}" cy="${ty.toFixed(1)}" r="5.5" fill="${goal}"/>`;
   }
