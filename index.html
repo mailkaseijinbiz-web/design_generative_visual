@@ -535,6 +535,7 @@ svg text{font-family:var(--font-ui)}
             <option value="25">同時に25枚（一気に・制限に当たりやすい）</option>
           </select>
           <button class="btn mini" id="gen-clear" data-ic="delete">キーを消す</button>
+          <p class="cap" id="gen-server-note" hidden>キーは<strong>Vercelに保存済み</strong>（サーバ側で使用）。ここでの入力は不要です。</p>
           <label class="genauto"><input type="checkbox" id="gen-auto">
             目標を置いたら自動で描く（置くたびに画像1枚ぶんの料金がかかる）</label>
           <p class="cap" id="gen-count-note"></p>
@@ -1463,7 +1464,7 @@ function smallJpeg(img){
 }
 async function filterByTheme(q, cands){
   const key = (localStorage.getItem(GEN_KEY_STORE) || "").trim();
-  if (!key || cands.length <= 8) return cands;
+  if (!hasGenKey() || cands.length <= 8) return cands;
   try {
     const parts = [{ text:
       `画像を番号つきで渡します。「${q}」の**商品写真**として使える番号だけを、`
@@ -1475,10 +1476,8 @@ async function filterByTheme(q, cands){
       parts.push({ text:`#${c.i}` });
       parts.push({ inline_data: smallJpeg(c.img) });
     });
-    const res = await fetch("https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent", {
-      method:"POST", headers:{ "content-type":"application/json", "x-goog-api-key":key },
-      body: JSON.stringify({ contents:[{ role:"user", parts }] })
-    });
+    const res = await genFetch(key, "gemini-2.5-flash", "generateContent",
+      { contents:[{ role:"user", parts }] });
     if (!res.ok) return cands;
     const j = await res.json();
     const txt = ((((j.candidates || [])[0] || {}).content || {}).parts || [])
@@ -3255,10 +3254,34 @@ const GEN_KEY_STORE = "kansei-morph.gemini-key";
 /* 9項目の差分を、絵として何をどう変えるかの指示に直す */
 /* 生成のもとにする画像（画像改変の結果 → なければ3Dの見え方） */
 /* 生成の実体。画面のどこから呼んでも同じ経路を通る。 */
+/* サーバ（Vercelの環境変数）にキーがあるかどうか。起動時に一度だけ確かめる */
+let GEN_SERVER = false;
+async function probeGenServer(){
+  if (!/^https?:/.test(location.protocol)) return;
+  try {
+    const r = await fetch("/api/gen", { method:"GET" });
+    if (r.ok) GEN_SERVER = !!(await r.json()).configured;
+  } catch (_) { /* 静的配信だけの場所では従来どおりブラウザのキーを使う */ }
+  if (!GEN_SERVER) return;
+  const sn = $("gen-server-note");
+  if (sn) sn.hidden = false;
+  const sk = $("side-key"); if (sk) sk.hidden = true;
+  drawAll();
+}
+const hasGenKey = () => GEN_SERVER || !!localStorage.getItem(GEN_KEY_STORE);
+/* Gemini系の呼び出し。サーバ中継のときはキーを送らない */
+function genFetch(key, model, action, body){
+  if (GEN_SERVER)
+    return fetch("/api/gen", { method:"POST",
+      headers:{ "content-type":"application/json" },
+      body: JSON.stringify({ model, action, body }) });
+  return fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:${action}`, {
+    method:"POST", headers:{ "content-type":"application/json", "x-goog-api-key":key },
+    body: JSON.stringify(body) });
+}
 const genImage = (key, model, prompt, data, mime) =>
   genImageMulti(key, model, prompt, [{ mime_type:mime, data }]);
 async function genImageMulti(key, model, prompt, imgs, square){
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`;
   const body = {
     contents: [{ role:"user", parts: [
       { text: prompt },
@@ -3271,9 +3294,7 @@ async function genImageMulti(key, model, prompt, imgs, square){
     body.generationConfig = body.generationConfig || { imageConfig: {} };
     body.generationConfig.imageConfig.imageSize = "1K";
   }
-  const send = () => fetch(url, { method:"POST",
-    headers:{ "content-type":"application/json", "x-goog-api-key":key },
-    body: JSON.stringify(body) });
+  const send = () => genFetch(key, model, "generateContent", body);
   let res = await send();
   if (!res.ok && res.status === 400 && body.generationConfig){
     delete body.generationConfig;      // 縦横比の指定に対応しないモデルなら外して一度だけ再試行
@@ -3332,7 +3353,7 @@ async function runGridGen(){
   const btn = $("grid-gen"), note = $("grid-note");
   if (gridRun){ gridRun.stop = true; return; }         // 走っている最中なら止める
   const key = (localStorage.getItem(GEN_KEY_STORE) || "").trim();
-  if (!key){
+  if (!key && !GEN_SERVER){
     note.textContent = "設定タブで Gemini のAPIキーを入れてください。";
     setTab("settings"); $("gen-key").focus();
     return;
@@ -3465,10 +3486,8 @@ async function drawOne(key, rg, dir, nref){
   return genImageMulti(key, model, sideGenPrompt(refs, dir, rg), imgs, true);
 }
 async function genImagen(key, model, prompt){
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:predict`;
-  const res = await fetch(url, { method:"POST",
-    headers:{ "content-type":"application/json", "x-goog-api-key":key },
-    body: JSON.stringify({ instances:[{ prompt }], parameters:{ sampleCount:1, aspectRatio:"1:1" } }) });
+  const res = await genFetch(key, model, "predict",
+    { instances:[{ prompt }], parameters:{ sampleCount:1, aspectRatio:"1:1" } });
   if (!res.ok){
     const tx = await res.text();
     return { error: res.status === 400 || res.status === 403
@@ -3509,19 +3528,19 @@ const autoGenOn = () => localStorage.getItem(AUTOGEN_STORE) === "1";
 function queueSideGen(){
   clearTimeout(sideGenTimer);
   if (!autoGenOn()) return;                           // 既定は手動。設定で自動にできる
-  if (!localStorage.getItem(GEN_KEY_STORE)) return;   // キーがなければ待つ
+  if (!hasGenKey()) return;                           // キーがなければ待つ
   sideGenTimer = setTimeout(runSideGen, 700);
 }
 async function runSideGen(){
   const key = ($("side-key").value || localStorage.getItem(GEN_KEY_STORE) || "").trim();
   const note = $("side-gen-note"), btn = $("side-gen"), spin = $("side-spin");
   if (!state.region) return;
-  if (!key){
+  if (!key && !GEN_SERVER){
     $("side-key").hidden = false; $("side-key").focus();
     note.textContent = "Gemini のAPIキーを入れてください。入れると、目標を置くたびに自動で描きます。";
     return;
   }
-  localStorage.setItem(GEN_KEY_STORE, key);
+  if (key){ localStorage.setItem(GEN_KEY_STORE, key); }
   $("side-key").hidden = true; $("side-key").value = "";
   const seq = ++sideGenSeq;
   btn.disabled = true; spin.hidden = false; note.textContent = "描いています…";
@@ -3658,6 +3677,7 @@ $("gen-auto").checked = autoGenOn();
 $("gen-auto").addEventListener("change", e =>
   localStorage.setItem(AUTOGEN_STORE, e.target.checked ? "1" : "0"));
 syncGenCount();
+probeGenServer();
 const GEN_MODEL_STORE = "kansei-morph.gen-model";
 {
   const saved = localStorage.getItem(GEN_MODEL_STORE);
