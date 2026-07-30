@@ -547,7 +547,10 @@ svg text{font-family:var(--font-ui)}
           <p class="cap" id="gen-count-note"></p>
           <div class="gridgen">
             <button class="btn mini" id="gal-export" data-ic="download">描いた案を書き出す</button>
-            <span class="cap" id="gal-note">描いた案はこのブラウザに自動保存され、次回すぐ地図に出ます。書き出して samples/gallery.js に置けば、公開ページにも同梱できます。</span>
+            <button class="btn mini" id="gal-import" data-ic="upload_file">読み込む</button>
+            <input type="file" id="gal-file" accept=".js,.json,text/javascript,application/json" hidden>
+            <span class="cap" id="gal-note">描いた案はこのブラウザに自動保存され、次回すぐ地図に出ます。書き出したファイルは別の端末で「読み込む」から取り込めるほか、samples/gallery.js に置けば公開ページにも同梱できます。</span>
+            <span class="cap" id="gal-stat"></span>
           </div>
         </div>
       </div>
@@ -3244,6 +3247,7 @@ function setTab(t){
   state.tab = t;
   document.querySelectorAll(".tab").forEach(b => b.setAttribute("aria-selected", b.dataset.tab === t));
   ["map", "settings"].forEach(k => $("pane-" + k).classList.toggle("on", k === t));
+  if (t === "settings") syncGalStat();
   drawAll();
 }
 /* ── 操作 ── */
@@ -3691,6 +3695,48 @@ async function exportGallery(){
   URL.revokeObjectURL(a.href);
   $("gal-note").textContent = `${all.length}枚を書き出しました。samples/gallery.js に置き換えると同梱されます。`;
 }
+/* 保存済みの案の枚数と容量を設定タブに出す */
+async function syncGalStat(){
+  const el = $("gal-stat"); if (!el) return;
+  const all = await galAll();
+  const mb = all.reduce((s, g) => s + (g.url || "").length * .75, 0) / 1048576;
+  let s = all.length
+    ? `保存済み：${all.length}枚・約${mb < 10 ? mb.toFixed(1) : Math.round(mb)}MB`
+    : "保存済みの案はまだありません。";
+  try {
+    const est = await navigator.storage.estimate();
+    if (est && est.quota)
+      s += `（このブラウザの割当 ${Math.round(est.quota / 1073741824)}GB のうち ${(est.usage / 1048576).toFixed(1)}MB 使用中）`;
+  } catch (_) { /* file:// などでは割当が取れないので枚数だけ出す */ }
+  el.textContent = s;
+}
+/* 書き出したファイル（gallery.js か、その中身のJSON）を読み込んで取り込む */
+async function importGallery(file){
+  const note = $("gal-note");
+  try {
+    let txt = (await file.text()).trim();
+    // window.__GALLERY = {...}; の形なら中身のJSONだけを取り出す
+    const m = txt.match(/=\s*(\{[\s\S]*\})\s*;?\s*$/);
+    if (m) txt = m[1];
+    const by = JSON.parse(txt);
+    let n = 0;
+    for (const [preset, list] of Object.entries(by)){
+      if (!Array.isArray(list)) continue;
+      for (const g of list){
+        if (!g || typeof g.url !== "string" || !g.xk || !g.yk || g.cx == null || g.cy == null) continue;
+        if (!g.url.startsWith("data:image/")) continue;
+        await galPut({ url:g.url, preset, xk:g.xk, yk:g.yk, cx:g.cx, cy:g.cy });
+        n++;
+      }
+    }
+    if (!n){ note.textContent = "読み込める案がありませんでした。書き出したファイルを選んでください。"; return; }
+    await loadGallery(state.preset);
+    syncGalStat();
+    note.textContent = `${n}枚を読み込みました。`;
+  } catch (_) {
+    note.textContent = "読み込めませんでした。書き出したファイル（gallery.js）を選んでください。";
+  }
+}
 /* この端末で描いた枚数を数え、概算額とともに設定に出す */
 const GEN_COUNT_STORE = "kansei-morph.gen-count";
 function bumpGenCount(){
@@ -3902,6 +3948,11 @@ $("theme-q").addEventListener("keydown", e => { if (e.key === "Enter") searchThe
 $("grid-gen").addEventListener("click", runGridGen);
 $("all-gen").addEventListener("click", runAllPairsGen);
 $("gal-export").addEventListener("click", exportGallery);
+$("gal-import").addEventListener("click", () => $("gal-file").click());
+$("gal-file").addEventListener("change", e => {
+  if (e.target.files[0]) importGallery(e.target.files[0]);
+  e.target.value = "";
+});
 function setHideMarket(on){
   state.hideMarket = on;
   setBtn($("mkt-toggle"), "visibility", on ? "市場を出す" : "市場を隠す");
