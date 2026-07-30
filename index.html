@@ -529,7 +529,10 @@ svg text{font-family:var(--font-ui)}
             <option value="imagen-4.0-fast-generate-001" selected>Imagen 4 Fast（約$0.02/枚・手本なし・探索向き）</option>
             <option value="gemini-2.5-flash-image">Nano Banana（約$0.04/枚・手本つき）</option>
             <option value="gemini-3-pro-image-preview">Nano Banana Pro（高品質・仕上げ向き）</option>
+            <option value="local-sd">ローカル（SD WebUI互換API・$0）</option>
           </select>
+          <input type="text" id="local-url" class="keyfield" hidden
+            placeholder="http://127.0.0.1:7860（A1111 / Draw Things のAPI）" spellcheck="false" autocomplete="off">
           <select id="gen-lanes" aria-label="同時に描く枚数">
             <option value="4">同時に4枚（控えめ）</option>
             <option value="8" selected>同時に8枚（標準）</option>
@@ -3273,7 +3276,8 @@ async function probeGenServer(){
   const sk = $("side-key"); if (sk) sk.hidden = true;
   drawAll();
 }
-const hasGenKey = () => GEN_SERVER || !!localStorage.getItem(GEN_KEY_STORE);
+const isLocalGen = () => ($("gen-model") || {}).value === "local-sd";
+const hasGenKey = () => isLocalGen() || GEN_SERVER || !!localStorage.getItem(GEN_KEY_STORE);
 /* Gemini系の呼び出し。サーバ中継のときはキーを送らない */
 function genFetch(key, model, action, body){
   if (GEN_SERVER)
@@ -3358,7 +3362,7 @@ async function runGridGen(){
   const btn = $("grid-gen"), note = $("grid-note");
   if (gridRun){ gridRun.stop = true; return; }         // 走っている最中なら止める
   const key = (localStorage.getItem(GEN_KEY_STORE) || "").trim();
-  if (!key && !GEN_SERVER){
+  if (!key && !GEN_SERVER && !isLocalGen()){
     note.textContent = "設定タブで Gemini のAPIキーを入れてください。";
     setTab("settings"); $("gen-key").focus();
     return;
@@ -3481,8 +3485,62 @@ function refBase64(it){
   return m ? { mime_type:m[1], data:m[2] } : null;
 }
 /* 位置をひとつ渡して、その狙いの姿を1枚描く。側面にも一覧にも同じ道を使う。 */
+/* ローカルのSD系モデル向け。9項目の狙いを英語の描写に写す */
+const AX_EN = {
+  atmos: ["calm, quiet, subdued mood", "vibrant, lively, energetic mood"],
+  image: ["classic, traditional styling", "modern, contemporary styling"],
+  color: ["pale, muted, neutral colors", "vivid, saturated primary colors"],
+  fit:   ["geometric, detached from the body", "ergonomic, body-hugging, enveloping"],
+  form:  ["ornate, intricate, decorative form", "pure, minimal, reduced form"],
+  func:  ["single-purpose, bare essentials", "multi-functional, highly convenient"],
+  matter:["smooth, uniform, seamless surface", "rich natural material texture"],
+  combi: ["conventional material combination", "unexpected novel material combination"],
+  surp:  ["predictable, honest, expected design", "surprising, unconventional design twist"]
+};
+const PRESET_EN = { glasses:"pair of eyeglasses", fridge:"refrigerator",
+  ct:"medical CT scanner", robot:"industrial robot arm", bus:"city bus", chair:"chair" };
+function sideGenPromptEn(rg, dir){
+  const id = state.preset || "chair", pr = PRESETS.find(x => x.id === id);
+  // 検索テーマは入力した言葉をそのまま使う（英語で検索していれば最良）
+  const name = PRESET_EN[id] || (pr ? pr.name : "product");
+  const L = [`New industrial design concept for a ${name}.`,
+    "Studio product photograph, single object centered, seamless plain light background,",
+    "soft studio lighting, photorealistic, no text, no logo, no people."];
+  const word = (k, v) => {
+    const d = Math.abs(v - 3);
+    if (d < .5) return null;
+    const side = AX_EN[k] ? AX_EN[k][v > 3 ? 1 : 0] : null;
+    if (!side) return null;
+    return (d >= 1.5 ? "extremely " : d >= .8 ? "clearly " : "slightly ") + side;
+  };
+  const ws = rg ? [[rg.xk, rg.x], [rg.yk, rg.y]].filter(e => e[1])
+    .map(([k, e]) => word(k, e.c)).filter(Boolean) : [];
+  if (ws.length) L.push("Design direction: " + ws.join("; ") + ".");
+  if (dir) L.push("Additional direction (Japanese, follow it): " + dir);
+  return L.join("\n");
+}
+/* ローカルのA1111互換API（Draw Things の API Server も同じ形）へ投げる */
+async function genLocalSD(prompt){
+  const base = (($("local-url") || {}).value || "http://127.0.0.1:7860").trim().replace(/\/+$/, "");
+  try {
+    const res = await fetch(base + "/sdapi/v1/txt2img", { method:"POST",
+      headers:{ "content-type":"application/json" },
+      body: JSON.stringify({ prompt,
+        negative_prompt:"text, watermark, logo, people, hands, multiple objects, cluttered background, collage",
+        width:768, height:768, seed:-1 }) });
+    if (!res.ok) return { error:`ローカルAPIに断られました（${res.status}）。起動と --api、CORSの許可を確かめてください。` };
+    const j = await res.json();
+    const b64 = (j.images || [])[0];
+    if (!b64) return { error:"ローカルAPIから画像が返りませんでした。" };
+    return { url: await shrinkImage(`data:image/png;base64,${b64}`, GEN_KEEP_PX) };
+  } catch (_) {
+    return { error:"ローカルAPIに届きませんでした。A1111なら --api --cors-allow-origins=* を付けて起動してください。" };
+  }
+}
 async function drawOne(key, rg, dir, nref){
   const model = $("gen-model").value;
+  if (model === "local-sd")
+    return genLocalSD(sideGenPromptEn(rg, dir));
   // Imagen は手本画像を渡せないぶん安い。指示文だけで描かせる。
   if (/^imagen/.test(model))
     return genImagen(key, model, sideGenPrompt([], dir, rg, true));
@@ -3519,7 +3577,7 @@ function syncGenCount(){
 }
 /* 描いた姿を地図に足す。同じ位置を描き直したときだけ差し替える。 */
 function keepImage(url, rg){
-  bumpGenCount();
+  if (!isLocalGen()) bumpGenCount();   // ローカルは$0なので数えない
   const g = { url, xk:rg.xk, yk:rg.yk,
               cx: rg.x ? rg.x.c : null, cy: rg.y ? rg.y.c : null };
   const i = state.gallery.findIndex(o => o.xk === g.xk && o.yk === g.yk
@@ -3541,7 +3599,7 @@ async function runSideGen(){
   const key = ($("side-key").value || localStorage.getItem(GEN_KEY_STORE) || "").trim();
   const note = $("side-gen-note"), btn = $("side-gen"), spin = $("side-spin");
   if (!state.region) return;
-  if (!key && !GEN_SERVER){
+  if (!key && !GEN_SERVER && !isLocalGen()){
     $("side-key").hidden = false; $("side-key").focus();
     note.textContent = "Gemini のAPIキーを入れてください。入れると、目標を置くたびに自動で描きます。";
     return;
@@ -3690,7 +3748,17 @@ const GEN_MODEL_STORE = "kansei-morph.gen-model";
   if (saved && [...$("gen-model").options].some(o => o.value === saved))
     $("gen-model").value = saved;
 }
-$("gen-model").addEventListener("change", e => localStorage.setItem(GEN_MODEL_STORE, e.target.value));
+const LOCAL_URL_STORE = "kansei-morph.local-sd";
+function syncLocalUrl(){
+  $("local-url").hidden = $("gen-model").value !== "local-sd";
+}
+$("local-url").value = localStorage.getItem(LOCAL_URL_STORE) || "http://127.0.0.1:7860";
+$("local-url").addEventListener("change", e => localStorage.setItem(LOCAL_URL_STORE, e.target.value.trim()));
+$("gen-model").addEventListener("change", e => {
+  localStorage.setItem(GEN_MODEL_STORE, e.target.value);
+  syncLocalUrl();
+});
+syncLocalUrl();
 $("gen-key").value = localStorage.getItem(GEN_KEY_STORE) || "";
 $("gen-key").addEventListener("change", e => {
   const v = e.target.value.trim();
