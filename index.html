@@ -482,6 +482,7 @@ svg text{font-family:var(--font-ui)}
               <option value="5">5×5（25枚）</option>
             </select>
             <button class="btn mini" id="grid-gen" data-ic="grid_on">一気に描く</button>
+            <button class="btn mini" id="all-gen" data-ic="bookmark_add">全軸ペアを描いて保存</button>
             <button class="btn mini" id="mkt-toggle" data-ic="visibility">市場を隠す</button>
             <span class="cap" id="grid-note"></span>
           </div>
@@ -544,6 +545,10 @@ svg text{font-family:var(--font-ui)}
           <label class="genauto"><input type="checkbox" id="gen-auto">
             目標を置いたら自動で描く（置くたびに画像1枚ぶんの料金がかかる）</label>
           <p class="cap" id="gen-count-note"></p>
+          <div class="gridgen">
+            <button class="btn mini" id="gal-export" data-ic="download">描いた案を書き出す</button>
+            <span class="cap" id="gal-note">描いた案はこのブラウザに自動保存され、次回すぐ地図に出ます。書き出して samples/gallery.js に置けば、公開ページにも同梱できます。</span>
+          </div>
         </div>
       </div>
     </div>
@@ -566,6 +571,7 @@ svg text{font-family:var(--font-ui)}
 
 <script src="samples/chairs.js"></script>
 <script src="samples/renders.js"></script>
+<script src="samples/gallery.js"></script>
 <script>
 "use strict";
 
@@ -1373,6 +1379,7 @@ function usePreset(id){
   state.genImage = null;
   state.gallery = [];
   state.region = null;
+  loadGallery(p.id);
   if (p.id === "chair" && CHAIRS.length) useChair(state.chairIdx);
   else loadCanvas(makePreset(p), `${p.name}（${p.context}）`);
   syncPresets();
@@ -2170,7 +2177,8 @@ function mapScene2D(ks, items){
     let size0 = autoThumb(centres());
     // 描いた案の正方形は写真より大きい。端の升（1や5）に置かれても
     // 枠からはみ出さないよう、その半分ぶんまで余白を広げる。
-    const genHalf = () => state.gallery.some(g => g.xk === xk && g.yk === yk)
+    const genHalf = () => state.gallery.some(g =>
+        (g.xk === xk && g.yk === yk) || (g.xk === yk && g.yk === xk))
       ? Math.max(64, Math.min(180, size0 * 2.2)) / 2 + 8 : 0;
     for (let pass = 0; pass < 2; pass++){
       IN = Math.max(22, Math.min(110, Math.max(extent(size0) + 6, genHalf())));
@@ -2699,7 +2707,7 @@ function conceptOverlay(items){
   }
 
   // 描いた姿は消さずに、それぞれの狙った位置へ置いたままにする
-  state.gallery.filter(g => g.xk === xk && g.yk === yk).forEach(g => {
+  galleryFor(xk, yk).forEach(g => {
     const ix = P.px(g.cx == null ? mxv : g.cx), iy = P.py(g.cy == null ? myv : g.cy);
     const S = Math.max(64, Math.min(180, state.thumb * 2.2)), h2 = S / 2;
     s += `<rect x="${(ix - h2).toFixed(1)}" y="${(iy - h2).toFixed(1)}" width="${S}" height="${S}" `
@@ -2832,9 +2840,10 @@ function galleryAt(sx, sy){
   const [xk, yk] = conceptAxes();
   const S = Math.max(64, Math.min(180, state.thumb * 2.2)), h2 = S / 2;
   // 重なっているときは後から描いたもの（上にあるもの）を優先する
-  for (let i = state.gallery.length - 1; i >= 0; i--){
-    const g = state.gallery[i];
-    if (g.xk !== xk || g.yk !== yk || g.cx == null || g.cy == null) continue;
+  const list = galleryFor(xk, yk);
+  for (let i = list.length - 1; i >= 0; i--){
+    const g = list[i];
+    if (g.cx == null || g.cy == null) continue;
     const ix = P.px(g.cx), iy = P.py(g.cy);
     if (Math.abs(sx - ix) <= h2 && Math.abs(sy - iy) <= h2) return g;
   }
@@ -3329,7 +3338,7 @@ async function genImageMulti(key, model, prompt, imgs, square){
 }
 /* 受け取った画像は縮小して持つ。APIの出力は1Kが下限の定額なので、
    ここで縮めても料金は変わらないが、25枚並べてもページが重くならない。 */
-const GEN_KEEP_PX = 512;   // 地図は最大180px表示、右パネルは2倍画素で最大~680px。その中間を取る
+const GEN_KEEP_PX = 320;   // 地図の表示は最大180px。右パネルでは多少甘くなるが、軽さを優先する
 async function shrinkImage(url, max){
   try {
     const img = await loadImg(url);
@@ -3370,27 +3379,38 @@ async function runGridGen(){
   }
   const dir = ($("side-dir") ? ($("side-dir").value || "").trim() : "");
   const all = gridCells();
-  const cells = all.filter(c => !state.gallery.some(g =>
-    g.xk === c.xk && g.yk === c.yk && g.cx === c.x.c && g.cy === c.y.c));
+  const done0 = galleryFor(all[0].xk, all[0].yk);
+  const cells = all.filter(c => !done0.some(g => g.cx === c.x.c && g.cy === c.y.c));
   if (!cells.length){
     note.textContent = "この升目はすべて描き終わっています。描き直すには、その升目を押してから描き直してください。";
     return;
   }
+  await runCells(key, dir, cells, "");
+}
+/* 升の一覧を順に描く共通処理。いまの軸の一気描きも、全軸ペアも同じ道を通る */
+async function runCells(key, dir, cells, label){
+  const btn = $("grid-gen"), note = $("grid-note");
   setHideMarket(true);                                 // 一覧に集中できるよう、市場は下げる
   const run = gridRun = { stop:false, done:0, ng:0 };
   setBtn(btn, "cancel", "止める");
   const tick = () => {
     note.textContent = run.stop ? `止めました（${run.done}/${cells.length}枚）`
-      : `描いています… ${run.done}/${cells.length}枚` + (run.ng ? `／${run.ng}枚は描けませんでした` : "");
+      : `${label}描いています… ${run.done}/${cells.length}枚` + (run.ng ? `／${run.ng}枚は描けませんでした` : "");
   };
   tick();
   let next = 0;
+  const [cxk, cyk] = conceptAxes();
   const lane = async () => {
     while (!run.stop && next < cells.length){
       const rg = cells[next++];
       const r = await drawOne(key, rg, dir, GRID_REFS).catch(() => ({ error:GEN_OFFLINE }));
       if (run.stop) return;
-      if (r.error) run.ng++; else { keepImage(r.url, rg); drawMap(); }
+      if (r.error) run.ng++;
+      else {
+        keepImage(r.url, rg);
+        // いま見ている軸ペアのときだけ描き直す（他ペアは保存だけして次回表示）
+        if ((rg.xk === cxk && rg.yk === cyk) || (rg.xk === cyk && rg.yk === cxk)) drawMap();
+      }
       run.done++; tick();
     }
   };
@@ -3401,11 +3421,40 @@ async function runGridGen(){
       setBtn(btn, "grid_on", "一気に描く");
       tick();
       if (!run.stop) note.textContent = run.ng
-        ? `${cells.length}枚のうち ${run.done - run.ng}枚を地図に並べました（${run.ng}枚は描けませんでした）。`
-        : `${cells.length}枚を地図に並べました。`;
+        ? `${label}${cells.length}枚のうち ${run.done - run.ng}枚を描きました（${run.ng}枚は描けませんでした）。`
+        : `${label}${cells.length}枚を描いて保存しました。`;
       drawMap();
     }
   }
+}
+/* 全36軸ペア×5×5＝900升をまとめて描き、保存する。描き終えた升は飛ばすので途中から再開できる */
+async function runAllPairsGen(){
+  if (gridRun){ gridRun.stop = true; return; }
+  const note = $("grid-note");
+  const key = (localStorage.getItem(GEN_KEY_STORE) || "").trim();
+  if (!key && !GEN_SERVER && !isLocalGen()){
+    note.textContent = "設定タブで Gemini のAPIキーを入れてください（ローカル生成なら不要）。";
+    setTab("settings"); $("gen-key").focus();
+    return;
+  }
+  const keys = AXES.map(a => a.key);
+  const half = 2 / CONCEPT_N;
+  const mk = v => ({ lo:Math.max(1, v - half), hi:Math.min(5, v + half), c:v });
+  const cells = [];
+  for (let i = 0; i < keys.length; i++)
+    for (let j = i + 1; j < keys.length; j++)
+      [1, 2, 3, 4, 5].forEach(yv => [1, 2, 3, 4, 5].forEach(xv =>
+        cells.push({ xk:keys[i], yk:keys[j], x:mk(xv), y:mk(yv) })));
+  const todo = cells.filter(c => !state.gallery.some(g =>
+    (g.xk === c.xk && g.yk === c.yk && g.cx === c.x.c && g.cy === c.y.c)
+    || (g.xk === c.yk && g.yk === c.xk && g.cx === c.y.c && g.cy === c.x.c)));
+  if (!todo.length){ note.textContent = `全${cells.length}升が描き終わっています。`; return; }
+  if (!isLocalGen()){
+    const per = /^imagen/.test($("gen-model").value) ? .02 : .04;
+    if (!confirm(`全軸ペア（${keys.length * (keys.length - 1) / 2}通り）×5×5の残り ${todo.length}枚を`
+      + `クラウドで描きます。目安 $${(todo.length * per).toFixed(2)}。続けますか？\n（ローカル生成に切り替えれば無料です）`)) return;
+  }
+  await runCells(key, "", todo, "全ペア：");
 }
 const GEN_OFFLINE = "外部への通信ができませんでした。公開ページでは遮断されています。ローカルで index.html を開いて試してください。";
 
@@ -3413,7 +3462,7 @@ const GEN_OFFLINE = "外部への通信ができませんでした。公開ペ�
    簡略化した立体ではなく、同じ市場に実在する写真を手本にする。 */
 function sideRefs(n, rg){
   const r = rg || state.region; if (!r) return [];
-  const [xk, yk] = conceptAxes();
+  const xk = r.xk, yk = r.yk;
   const tx = r.x ? r.x.c : 3, ty = r.y ? r.y.c : 3;
   return visibleCorpus()
     .filter(it => it.imgId)
@@ -3425,7 +3474,7 @@ function sideRefs(n, rg){
 }
 function sideGenPrompt(refs, dir, rg, textOnly){
   const id = state.preset || "chair", p = PRESETS.find(x => x.id === id), r = rg || state.region;
-  const [xk, yk] = conceptAxes();
+  const [xk, yk] = r ? [r.xk, r.yk] : conceptAxes();
   const L = [];
   const rendered = refs.length && refs.every(it => it.src === "レンダ");
   if (textOnly){
@@ -3536,7 +3585,7 @@ async function genLocalSD(prompt){
         headers:{ "content-type":"application/json" },
         body: JSON.stringify({ prompt,
           negative_prompt:"text, watermark, logo, people, hands, multiple objects, cluttered background, collage",
-          width:768, height:768, seed:-1 }) });
+          width:320, height:320, seed:-1 }) });
       if (!res.ok){
         last = { error:`ローカルAPIに断られました（${res.status}）。Draw Things / A1111 の起動とモデルの読み込みを確かめてください。` };
         continue;
@@ -3577,6 +3626,71 @@ async function genImagen(key, model, prompt){
   if (!b64) return { error:"画像が返りませんでした。" };
   return { url: await shrinkImage(`data:${pr.mimeType || "image/png"};base64,${b64}`, GEN_KEEP_PX) };
 }
+/* ── 描いた案の保存 ──
+   IndexedDBに置き、次回はすぐ地図に出す。samples/gallery.js（window.__GALLERY）で
+   同梱もでき、保存分が同じ升にあればそちらが勝つ。 */
+let idbP = null;
+function idb(){
+  if (!idbP) idbP = new Promise((ok, ng) => {
+    const rq = indexedDB.open("kansei-morph", 1);
+    rq.onupgradeneeded = () => rq.result.createObjectStore("gallery");
+    rq.onsuccess = () => ok(rq.result);
+    rq.onerror = () => ng(rq.error);
+  });
+  return idbP;
+}
+const galKey = g => `${g.preset}|${g.xk}|${g.yk}|${g.cx}|${g.cy}`;
+async function galPut(g){
+  try {
+    (await idb()).transaction("gallery", "readwrite").objectStore("gallery").put(g, galKey(g));
+  } catch (_) { /* 保存できない環境では、その場限りで動く */ }
+}
+async function galAll(preset){
+  try {
+    const db = await idb();
+    return await new Promise(ok => {
+      const rq = db.transaction("gallery").objectStore("gallery").getAll();
+      rq.onsuccess = () => ok((rq.result || []).filter(g => !preset || g.preset === preset));
+      rq.onerror = () => ok([]);
+    });
+  } catch (_) { return []; }
+}
+let galSeq = 0;
+async function loadGallery(preset){
+  const seq = ++galSeq;
+  const shipped = ((window.__GALLERY || {})[preset] || []).map(g => ({ ...g, preset }));
+  const saved = await galAll(preset);
+  if (seq !== galSeq || state.preset !== preset) return;
+  const by = new Map();
+  shipped.forEach(g => by.set(galKey(g), g));
+  saved.forEach(g => by.set(galKey(g), g));
+  state.gallery = [...by.values()];
+  if (state.tab === "map") drawMap();
+}
+/* いまの軸ペアに合わせて向きをそろえて返す（保存時と縦横が逆でも出す） */
+function galleryFor(xk, yk){
+  const out = [];
+  state.gallery.forEach(g => {
+    if (g.xk === xk && g.yk === yk) out.push(g);
+    else if (g.xk === yk && g.yk === xk && g.cx != null && g.cy != null)
+      out.push({ ...g, xk, yk, cx:g.cy, cy:g.cx });
+  });
+  return out;
+}
+/* 描いた案をすべて samples/gallery.js の形で書き出す */
+async function exportGallery(){
+  const all = await galAll();
+  const by = {};
+  all.forEach(g => (by[g.preset] = by[g.preset] || []).push(g));
+  const body = "/* 描いた案の同梱ファイル。設定の「描いた案を書き出す」で作り直せる。 */\n"
+    + "window.__GALLERY = " + JSON.stringify(by) + ";\n";
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(new Blob([body], { type:"text/javascript" }));
+  a.download = "gallery.js";
+  a.click();
+  URL.revokeObjectURL(a.href);
+  $("gal-note").textContent = `${all.length}枚を書き出しました。samples/gallery.js に置き換えると同梱されます。`;
+}
 /* この端末で描いた枚数を数え、概算額とともに設定に出す */
 const GEN_COUNT_STORE = "kansei-morph.gen-count";
 function bumpGenCount(){
@@ -3591,11 +3705,12 @@ function syncGenCount(){
 /* 描いた姿を地図に足す。同じ位置を描き直したときだけ差し替える。 */
 function keepImage(url, rg){
   if (!isLocalGen()) bumpGenCount();   // ローカルは$0なので数えない
-  const g = { url, xk:rg.xk, yk:rg.yk,
+  const g = { url, preset:state.preset, xk:rg.xk, yk:rg.yk,
               cx: rg.x ? rg.x.c : null, cy: rg.y ? rg.y.c : null };
   const i = state.gallery.findIndex(o => o.xk === g.xk && o.yk === g.yk
     && o.cx === g.cx && o.cy === g.cy);
   if (i >= 0) state.gallery[i] = g; else state.gallery.push(g);
+  galPut(g);                            // 次回もすぐ出せるよう、この端末に保存する
   return g;
 }
 /* 目標を置くたびに自動で走る。連打しても最後の一回だけ投げる。 */
@@ -3755,6 +3870,7 @@ $("gen-auto").addEventListener("change", e =>
   localStorage.setItem(AUTOGEN_STORE, e.target.checked ? "1" : "0"));
 syncGenCount();
 probeGenServer();
+loadGallery(state.preset);
 const GEN_MODEL_STORE = "kansei-morph.gen-model";
 {
   const saved = localStorage.getItem(GEN_MODEL_STORE);
@@ -3784,6 +3900,8 @@ $("side-gen").addEventListener("click", runSideGen);
 $("theme-go").addEventListener("click", () => searchTheme($("theme-q").value));
 $("theme-q").addEventListener("keydown", e => { if (e.key === "Enter") searchTheme(e.target.value); });
 $("grid-gen").addEventListener("click", runGridGen);
+$("all-gen").addEventListener("click", runAllPairsGen);
+$("gal-export").addEventListener("click", exportGallery);
 function setHideMarket(on){
   state.hideMarket = on;
   setBtn($("mkt-toggle"), "visibility", on ? "市場を出す" : "市場を隠す");
