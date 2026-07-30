@@ -22,6 +22,11 @@ class Handler(http.server.SimpleHTTPRequestHandler):
     def __init__(self, *a, **kw):
         super().__init__(*a, directory=ROOT, **kw)
 
+    # git pull 直後に古いページが出ないよう、ブラウザにキャッシュさせない
+    def end_headers(self):
+        self.send_header("Cache-Control", "no-store")
+        super().end_headers()
+
     def do_POST(self):
         if not self.path.startswith("/sdapi/"):
             self.send_response(404)
