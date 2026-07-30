@@ -2693,10 +2693,6 @@ function conceptOverlay(items){
   if (sel){
     n0 = items.filter(it => (!sel.x || (it.p[xk] >= sel.x.lo && it.p[xk] <= sel.x.hi))
                          && (!sel.y || (it.p[yk] >= sel.y.lo && it.p[yk] <= sel.y.hi))).length;
-    const cx0 = sel.x ? P.px(sel.x.lo) : P.x0, cx1 = sel.x ? P.px(sel.x.hi) : P.x1;
-    const cy0 = sel.y ? P.py(sel.y.hi) : P.y0, cy1 = sel.y ? P.py(sel.y.lo) : P.y1;
-    s += `<rect x="${cx0.toFixed(1)}" y="${cy0.toFixed(1)}" width="${(cx1-cx0).toFixed(1)}" `
-      + `height="${(cy1-cy0).toFixed(1)}" fill="${goal}" fill-opacity=".07"/>`;
   }
 
   // 描いた姿は消さずに、それぞれの狙った位置へ置いたままにする
