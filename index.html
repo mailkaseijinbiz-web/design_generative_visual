@@ -532,7 +532,7 @@ svg text{font-family:var(--font-ui)}
             <option value="local-sd">ローカル（SD WebUI互換API・$0）</option>
           </select>
           <input type="text" id="local-url" class="keyfield" hidden
-            placeholder="http://127.0.0.1:7860（A1111 / Draw Things のAPI）" spellcheck="false" autocomplete="off">
+            placeholder="http://127.0.0.1:7860（空欄＝localrelay経由）" spellcheck="false" autocomplete="off">
           <select id="gen-lanes" aria-label="同時に描く枚数">
             <option value="4">同時に4枚（控えめ）</option>
             <option value="8" selected>同時に8枚（標準）</option>
@@ -3521,7 +3521,8 @@ function sideGenPromptEn(rg, dir){
 }
 /* ローカルのA1111互換API（Draw Things の API Server も同じ形）へ投げる */
 async function genLocalSD(prompt){
-  const base = (($("local-url") || {}).value || "http://127.0.0.1:7860").trim().replace(/\/+$/, "");
+  // 空欄なら、このページと同じ配信元へ（tools/localrelay.py で開いたとき用）
+  const base = (($("local-url") || {}).value || "").trim().replace(/\/+$/, "");
   try {
     const res = await fetch(base + "/sdapi/v1/txt2img", { method:"POST",
       headers:{ "content-type":"application/json" },

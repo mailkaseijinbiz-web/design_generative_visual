@@ -114,7 +114,7 @@ Amazonや一般の画像検索からの収集は規約上ここからは踏み�
 
 - **2次元／3次元** — 地図を平面で見るか立体で見るか。既定は2次元。3次元にすると、ばらつきの大きい未使用の項目が自動で奥行きに入り、地図をドラッグして回せるようになる。
 - **Gemini APIキー**、**モデル**、**同時に描く枚数**、**目標を置いたら自動で描く**（既定OFF）。
-- **ローカル生成（$0）も選べる**。「ローカル（SD WebUI互換API）」を選ぶとURL欄が出て、既定は `http://127.0.0.1:7860`。Stable Diffusion WebUI（A1111）を `--api --cors-allow-origins=*` で起動するか、Draw Things のAPIサーバを有効にして使う。指示文は内蔵の英語テンプレ（9項目の狙い→英語の描写）で送り、キー不要・枚数カウントも増えない。手本画像は使えない。M4 Pro 24GB なら SDXL Turbo/Lightning で1枚数秒、FLUX.1 schnell（量子化）で30秒〜1分が目安。
+- **ローカル生成（$0）も選べる**。「ローカル（SD WebUI互換API）」を選ぶとURL欄が出る。Stable Diffusion WebUI（A1111）を `--api --cors-allow-origins=*` で起動するか、Draw Things のAPIサーバを有効にして使う。CORSで繋がらないときは同梱の中継 `python3 tools/localrelay.py` を起動して `http://127.0.0.1:8787` を開き、**URL欄を空**にする（ページと同じ配信元を通るのでCORS設定が不要になる）。指示文は内蔵の英語テンプレ（9項目の狙い→英語の描写）で送り、キー不要・枚数カウントも増えない。手本画像は使えない。M4 Pro 24GB なら SDXL Turbo/Lightning で1枚数秒、FLUX.1 schnell（量子化）で30秒〜1分が目安。
 - クラウドのモデルは3つで、**既定はいちばん安い Imagen 4 Fast**（約$0.02/枚・**手本画像を渡せない**ので市場との地続き感は落ちる・探索向き）。ほかに **Nano Banana**（約$0.04/枚・手本つき・標準）と **Nano Banana Pro**（高品質・数倍高い・仕上げ向き）。同じキーでそのまま切り替えられ、選んだモデルはこのブラウザに保存される。安く回すなら、探索は Imagen 4 Fast、気に入った区画は Nano Banana で手本つきに、仕上げの数枚だけ Pro。
 - **この端末で描いた枚数と概算額**（Nano Banana換算・$0.04/枚の目安）がここに出る。料金の実額はGoogle AI Studioの請求画面が正。Nano Banana Pro は1枚あたり数倍高いので、仕上げの数枚だけに使うのが安い。
 
@@ -165,6 +165,7 @@ index.html          アプリ本体（単一ファイル、依存なし）
 samples/chairs.js   椅子の実写サンプル30点（560px / JPEG q62 を data URI で同梱）
 samples/renders.js  他5テーマの事前レンダ145点（448px / JPEG q55、アプリ自身の3Dレンダラで自動生成）
 api/gen.js          Geminiへの中継（Vercelサーバレス関数。環境変数 GEMINI_API_KEY を使う）
+tools/localrelay.py ローカル実行用の配信＋Draw Things/A1111中継（python3標準ライブラリのみ）
 vercel.json         静的配信の設定（ビルドなし）
 ```
 
