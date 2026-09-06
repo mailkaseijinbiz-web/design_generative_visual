@@ -83,7 +83,13 @@ button{cursor:pointer}
 }
 .tab:hover{background:var(--hover); color:var(--ink)}
 .tab[aria-selected="true"]{color:var(--ink); font-weight:600; border-bottom-color:var(--ink)}
+/* 表示は設定で切り替える（既定はどちらも非表示） */
+body:not(.ui-search) .tabbar .searchbox, body:not(.ui-search) .tabbar .presets{display:none}
+body:not(.ui-batch) #pane-map .gridgen{display:none}
 .tabbar .searchbox{margin-left:auto}
+.uirow{display:flex; gap:18px; flex-wrap:wrap}
+.uirow label{display:flex; gap:8px; align-items:center; font-size:12.5px; color:var(--ink-2); cursor:pointer}
+.uirow input{accent-color:var(--now)}
 .searchbox{display:flex; align-items:center; gap:6px; min-width:0}
 .searchbox input{width:230px; height:32px; padding:0 13px; border:1px solid var(--line);
   border-radius:16px; background:var(--surface); font:inherit; font-size:13px; color:var(--ink)}
@@ -518,6 +524,12 @@ svg text{font-family:var(--font-ui)}
           <button id="dim-3d" aria-pressed="false" data-ic="view_in_ar">3次元</button>
         </div>
         <p class="hint" id="dim-note" style="margin-top:12px"></p>
+        <h3 data-ic="visibility" style="margin-top:22px">表示する操作</h3>
+        <p class="hint">ふだん使わない操作は畳んでおけます。チェックすると画面に出ます。</p>
+        <div class="uirow">
+          <label><input type="checkbox" id="ui-search"> テーマの検索と対象の切替（上部）</label>
+          <label><input type="checkbox" id="ui-batch"> 一括生成の操作（一気に描く・全軸ペア・市場を隠す）</label>
+        </div>
       </div>
       <div class="block">
         <h3 data-ic="auto_awesome">AIによる描画（Gemini / Nano Banana）</h3>
@@ -3917,6 +3929,17 @@ $("gen-auto").addEventListener("change", e =>
 syncGenCount();
 probeGenServer();
 loadGallery(state.preset);
+/* 表示の切替（既定は非表示。チェックはこのブラウザに保存） */
+[["ui-search", "kansei-morph.ui-search"], ["ui-batch", "kansei-morph.ui-batch"]].forEach(([id, store]) => {
+  const el = $(id);
+  const apply = on => document.body.classList.toggle(id, on);
+  el.checked = localStorage.getItem(store) === "1";
+  apply(el.checked);
+  el.addEventListener("change", e => {
+    localStorage.setItem(store, e.target.checked ? "1" : "0");
+    apply(e.target.checked);
+  });
+});
 const GEN_MODEL_STORE = "kansei-morph.gen-model";
 {
   const saved = localStorage.getItem(GEN_MODEL_STORE);
