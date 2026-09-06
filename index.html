@@ -561,7 +561,8 @@ svg text{font-family:var(--font-ui)}
             <button class="btn mini" id="gal-export" data-ic="download">描いた案を書き出す</button>
             <button class="btn mini" id="gal-import" data-ic="upload_file">読み込む</button>
             <input type="file" id="gal-file" accept=".js,.json,text/javascript,application/json" hidden>
-            <span class="cap" id="gal-note">描いた案はこのブラウザに自動保存され、次回すぐ地図に出ます。書き出したファイルは別の端末で「読み込む」から取り込めるほか、samples/gallery.js に置けば公開ページにも同梱できます。</span>
+            <button class="btn mini" id="gal-restore" data-ic="restart_alt">保存分を地図に出す</button>
+            <span class="cap" id="gal-note">描いた案はリロードすると地図から消えます（裏では保存されています）。「保存分を地図に出す」で呼び戻し、「描いた案を書き出す」でファイルに、書き出したファイルは「読み込む」で取り込めます。</span>
             <span class="cap" id="gal-stat"></span>
           </div>
         </div>
@@ -1394,7 +1395,6 @@ function usePreset(id){
   state.genImage = null;
   state.gallery = [];
   state.region = null;
-  loadGallery(p.id);
   if (p.id === "chair" && CHAIRS.length) useChair(state.chairIdx);
   else loadCanvas(makePreset(p), `${p.name}（${p.context}）`);
   syncPresets();
@@ -3932,7 +3932,6 @@ $("gen-auto").addEventListener("change", e =>
   localStorage.setItem(AUTOGEN_STORE, e.target.checked ? "1" : "0"));
 syncGenCount();
 probeGenServer();
-loadGallery(state.preset);
 /* 表示の切替（既定は非表示。チェックはこのブラウザに保存） */
 [["ui-search", "kansei-morph.ui-search"], ["ui-batch", "kansei-morph.ui-batch"]].forEach(([id, store]) => {
   const el = $(id);
@@ -3976,6 +3975,11 @@ $("grid-gen").addEventListener("click", runGridGen);
 $("all-gen").addEventListener("click", runAllPairsGen);
 $("gal-export").addEventListener("click", exportGallery);
 $("gal-import").addEventListener("click", () => $("gal-file").click());
+$("gal-restore").addEventListener("click", async () => {
+  await loadGallery(state.preset);
+  $("gal-note").textContent = `保存分 ${state.gallery.length}枚を地図に出しました。`;
+  setTab("map");
+});
 $("gal-file").addEventListener("change", e => {
   if (e.target.files[0]) importGallery(e.target.files[0]);
   e.target.value = "";
