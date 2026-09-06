@@ -2306,7 +2306,7 @@ function mapScene2D(ks, items){
   // クラスタ（ズームアウトしているときだけ、群の範囲と名前を出す）
   if (!one && V2.k <= CLUSTER_K) mk2 += clusterMarks(items, xk, yk, px, py, [x0, x1, y0], paper, ink3, avoid);
   plot += `<g class="mkt">${mk2}</g>`;
-  plot += `<g pointer-events="none">` + marker(gx, gy, goal, paper) + `</g>`;
+  if (one) plot += `<g pointer-events="none">` + marker(gx, gy, goal, paper) + `</g>`;
 
   // 軸の見出し（項目名と両端の意味）
   let s = `<g clip-path="url(#map-clip)">${plot}</g>`;
@@ -2743,6 +2743,10 @@ function conceptOverlay(items){
       + `<circle cx="${tx.toFixed(1)}" cy="${ty.toFixed(1)}" r="7" fill="${paper}"/>`
       + `<circle cx="${tx.toFixed(1)}" cy="${ty.toFixed(1)}" r="5.5" fill="${goal}"/>`;
   }
+
+  // 目標の旗は生成画像より上に描く（画像に隠れて見えなくならないように）
+  const fgx = P.px(state.goal[xk]), fgy = P.py(state.goal[yk]);
+  s += `<g pointer-events="none">` + marker(fgx, fgy, goal, paper) + `</g>`;
 
   conceptNote(sel, n0, mxv, myv);
   return `<g clip-path="url(#map-clip)">${s}</g>`;
